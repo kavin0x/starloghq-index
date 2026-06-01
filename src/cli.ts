@@ -5,6 +5,7 @@ import { KnownCategorySchema } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
+import { getPackageVersion } from './paths.js';
 
 const VALID_CATEGORIES = KnownCategorySchema.options;
 
@@ -40,7 +41,7 @@ const program = new Command();
 
 program
   .name('starlog')
-  .version('0.1.0')
+  .version(getPackageVersion())
   .description('Capability indexing layer for AI coding agents');
 
 program

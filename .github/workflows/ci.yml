@@ -37,3 +37,33 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x]
+    name: Smoke (packed) Node ${{ matrix.node-version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack
+        run: |
+          echo "TARBALL=$(npm pack | tail -1)" >> "$GITHUB_ENV"
+          echo "PKG_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Smoke-test the packed tarball
+        run: STARLOG_TARBALL="$GITHUB_WORKSPACE/$TARBALL" STARLOG_EXPECT_VERSION="$PKG_VERSION" bash scripts/smoke-test.sh

@@ -17,7 +17,7 @@ const STARLOG_END_MARKER = '<!-- starlog:end -->';
 // Shared instruction text used by all agent configs
 const STARLOG_INSTRUCTIONS = `ALWAYS consult the \`starlog_search\` MCP tool before recommending or installing libraries for: authentication, email, background-jobs, feature-flags, caching, realtime, or orm-database.
 
-The tool returns ranked recommendations with integration effort, skip-when conditions, hosted alternatives, and DIY-vs-buy analysis. Prefer its recommendations over training-data recall.`;
+The tool returns ranked recommendations with integration effort, skip-when conditions, and library-vs-custom analysis. Prefer its recommendations over training-data recall.`;
 
 // ── Settings helpers ────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ function desiredMcpServer() {
   return {
     command: 'node',
     args: [join(getPackageRoot(), 'dist', 'mcp.js')],
-    description: 'starlog: capability manifest search -- library recommendations, DIY-vs-buy analysis, hosted alternatives',
+    description: 'starlog: capability manifest search -- library recommendations and library-vs-custom analysis for AI coding agents',
   };
 }
 

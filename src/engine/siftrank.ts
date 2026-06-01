@@ -68,7 +68,9 @@ const keywordSiftrank: SiftrankFn = async (manifests, query) => {
   return manifests.map((m, i) => {
     const text = [m.name, m.solves, ...m.best_for, ...m.stack_affinity].join(' ').toLowerCase();
     const score = terms.reduce((s, t) => s + (text.includes(t) ? 25 : 0), 0);
-    return { key: m.id, value: m.name, object: {} as Record<string, unknown>, score: Math.min(score, 100), exposure: 1, rank: i };
+    // rank is 1-based to match the Go siftrank path and the test mocks (L11);
+    // search re-sorts by score regardless, so this is purely for consistency.
+    return { key: m.id, value: m.name, object: {} as Record<string, unknown>, score: Math.min(score, 100), exposure: 1, rank: i + 1 };
   });
 };
 

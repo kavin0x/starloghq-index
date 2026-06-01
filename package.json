@@ -1,6 +1,6 @@
 {
   "name": "starloghq",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Better library decisions for your AI coding agent — a local MCP tool and package-install hook that indexes library capabilities. Free, no account.",
   "keywords": [
     "mcp",
@@ -34,7 +34,9 @@
     "prepublishOnly": "npm run build",
     "search": "tsx src/cli.ts search",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "bash scripts/smoke-test.sh",
+    "verify:release": "bash scripts/verify-release.sh"
   },
   "engines": {
     "node": ">=20"

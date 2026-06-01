@@ -58,7 +58,10 @@ export async function search(
     manifestMap.set(m.id, m);
   }
 
-  // Step 4.5: MMR diversity rerank (if enabled, per DIV-02)
+  // Step 4.5: MMR diversity rerank (if enabled, per DIV-02).
+  // lambda >= 1.0 (or undefined) short-circuits MMR entirely and uses pure
+  // score-descending order — so lambda=1 means "no diversity," and mmrRerank's
+  // own internal default is intentionally unreachable via this public path (L14).
   let ranked: SiftrankResult[];
   if (options.diversityLambda !== undefined && options.diversityLambda < 1.0) {
     ranked = mmrRerank(siftrankResults, manifestMap, options.diversityLambda);

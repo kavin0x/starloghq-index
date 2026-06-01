@@ -2,9 +2,11 @@
 
 **Better library decisions for your AI coding agent — free, local, no account.**
 
-AI coding agents (Claude Code, Cursor, Copilot) pick libraries from training data. The results are weak: agents draw from only 32–39 unique libraries across projects, flip their recommendation 83% of the time between model versions, and hand-roll custom implementations ~60% of the time even when a battle-tested library already exists.
+AI coding agents (Claude Code, Cursor, Copilot) pick libraries from their training data — which ranks options by how often they appeared in scraped code, not by what actually fits your task. Popularity, not merit. The results are weak: research finds agents draw from only 32–39 unique libraries across projects and are highly inconsistent (83%) in what they recommend, and they default to hand-rolling custom code instead of reaching for a battle-tested library across most capability categories.
 
-Starlog gives your agent a structured, queryable index of library capabilities so it stops guessing. It runs locally as an MCP tool and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
+AI-suggested dependencies are also often unsafe: research finds ~49% carry known vulnerabilities and ~34% are hallucinated outright — the package simply doesn't exist. Picking a real, well-maintained library, and knowing when to skip one, is most of the battle.
+
+Starlog is a local **capability index** for AI coding agents: a structured, queryable description of what libraries actually do, ranked by fitness for your task and by health/quality signals — not by download count or stars. It runs entirely on your machine as an MCP server and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
 
 **Benchmarked across 1,008 runs on 3 Claude models:**
 
@@ -127,7 +129,7 @@ Query Engine (keyword matching + relevance scoring)
 Transport (MCP server or CLI)
 ```
 
-Each manifest is a structured description of a library — not documentation, but **capability data**: what it solves, which stacks it fits, integration effort, and when to skip it.
+Each manifest is a structured description of a library — not documentation, but **capability data**: what it solves, which stacks it fits, integration effort, and when to skip it. Tools like Context7 index *documentation* (how an API works); Starlog indexes *capability* (what a library is for, and when not to use it).
 
 **Stored fields:** `id`, `name`, `category`, `solves`, `stack_affinity`, `integration_effort`, `best_for`, `skip_when`, `health`, `quality`
 

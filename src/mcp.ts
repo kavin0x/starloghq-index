@@ -5,6 +5,7 @@ import { z } from 'zod/v4';
 import { KnownCategorySchema } from './manifest/schema.js';
 import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
+import { getPackageVersion } from './paths.js';
 
 // ── Result formatting ───────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ function formatResults(query: string, results: QueryResult[]): string {
 // ── Server ──────────────────────────────────────────────────────────────────
 
 export function createServer(): McpServer {
-  const server = new McpServer({ name: 'starlog', version: '0.1.0' });
+  const server = new McpServer({ name: 'starlog', version: getPackageVersion() });
 
   server.tool(
     'starlog_search',
@@ -68,8 +69,9 @@ export async function startMcpServer(): Promise<void> {
   await server.connect(transport);
 }
 
-// Run-if-main guard: auto-start when executed directly (node dist/mcp.js or
-// `starlog mcp`), but stay importable for tests without opening stdio.
+// Run-if-main guard: auto-start when executed directly (node dist/mcp.js, the
+// command wired into settings.json), but stay importable for tests without
+// opening stdio.
 const invokedDirectly =
   process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
 
