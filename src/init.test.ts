@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readFile, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { upsertMarkedSection, removeMarkedSection } from './init.js';
+import { upsertMarkedSection, removeMarkedSection, markedSectionAction } from './init.js';
 
 let tmpRoot: string;
 
@@ -146,5 +146,46 @@ describe('upsertMarkedSection() + removeMarkedSection()', () => {
     expect(down.changed).toBe(false);
     expect(down.backedUp).toBe(false);
     expect(await exists(`${target}.bak`)).toBe(false);
+  });
+});
+
+describe('markedSectionAction() — preview parity with upsertMarkedSection (init plan can\'t lie)', () => {
+  // For every file state, the predicted plan action must agree with what apply
+  // actually does: create/update => changed:true, unchanged => changed:false.
+  async function assertParity(target: string, expected: 'create' | 'update' | 'unchanged') {
+    const predicted = await markedSectionAction(target);
+    expect(predicted).toBe(expected);
+    const applied = await upsertMarkedSection(target);
+    expect(applied.changed).toBe(expected !== 'unchanged');
+  }
+
+  it('predicts "create" for an absent file', async () => {
+    await assertParity(join(tmpRoot, 'CLAUDE.md'), 'create');
+  });
+
+  it('predicts "update" for a file that exists but has no section', async () => {
+    const target = join(tmpRoot, 'CLAUDE.md');
+    await writeFile(target, '# My stuff\n');
+    await assertParity(target, 'update');
+  });
+
+  it('predicts "unchanged" for a freshly installed section', async () => {
+    const target = join(tmpRoot, 'CLAUDE.md');
+    await upsertMarkedSection(target); // install
+    await assertParity(target, 'unchanged');
+  });
+
+  it('predicts "update" for a drifted bounded section', async () => {
+    const target = join(tmpRoot, 'CLAUDE.md');
+    await upsertMarkedSection(target);
+    const stale = (await readFile(target, 'utf8')).replace('ALWAYS consult', 'STALE — ALWAYS consult');
+    await writeFile(target, stale);
+    await assertParity(target, 'update');
+  });
+
+  it('predicts "unchanged" for a legacy section (no end marker), matching upsert\'s refusal', async () => {
+    const target = join(tmpRoot, 'CLAUDE.md');
+    await writeFile(target, '# Title\n\n<!-- starlog:init -->\n## Starlog — Capability Search\n\nold\n');
+    await assertParity(target, 'unchanged');
   });
 });

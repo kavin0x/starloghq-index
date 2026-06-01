@@ -1,6 +1,7 @@
 import { readFile, mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { createInterface } from 'node:readline/promises';
 import { getPackageRoot } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { atomicWrite } from './fsutil.js';
@@ -42,6 +43,17 @@ async function writeSettingsJson(settings: Settings): Promise<void> {
 
 // ── MCP server ──────────────────────────────────────────────────────────
 
+/** The Starlog MCP server entry written into ~/.claude/settings.json. Shared
+ *  by the apply path (configureMcpServer) and the preview path (buildInstallPlan)
+ *  so the two can never disagree on what "already configured" means. */
+function desiredMcpServer() {
+  return {
+    command: 'node',
+    args: [join(getPackageRoot(), 'dist', 'mcp.js')],
+    description: 'starlog: capability manifest search -- library recommendations, DIY-vs-buy analysis, hosted alternatives',
+  };
+}
+
 async function configureMcpServer(): Promise<{ changed: boolean }> {
   const settings = await readSettingsJson();
   if (!settings.mcpServers || typeof settings.mcpServers !== 'object') {
@@ -49,12 +61,7 @@ async function configureMcpServer(): Promise<{ changed: boolean }> {
   }
   const servers = settings.mcpServers as Record<string, unknown>;
 
-  const pkgRoot = getPackageRoot();
-  const desired = {
-    command: 'node',
-    args: [join(pkgRoot, 'dist', 'mcp.js')],
-    description: 'starlog: capability manifest search -- library recommendations, DIY-vs-buy analysis, hosted alternatives',
-  };
+  const desired = desiredMcpServer();
 
   if (JSON.stringify(servers.starlog) === JSON.stringify(desired)) {
     return { changed: false };
@@ -476,10 +483,176 @@ function removeCodex(projectDir: string): Promise<{ changed: boolean; backedUp: 
 
 // ── Orchestrator ────────────────────────────────────────────────────────
 
+// ── Install plan (preview + confirm) ──────────────────────────────────────
+//
+// init never writes blind. It first builds a read-only plan of every file it
+// would touch, prints it, and (unless --yes) asks the user to confirm. The plan
+// reuses the SAME comparison helpers the apply path uses, so "unchanged" here
+// means the apply step would be a genuine no-op.
+
+type PlanAction = 'create' | 'update' | 'unchanged';
+
+interface PlanItem {
+  label: string;
+  path: string;
+  action: PlanAction;
+  apply: () => Promise<{ changed: boolean }>;
+}
+
+interface SkippedItem {
+  label: string;
+  reason: string;
+}
+
+/** Abbreviate an absolute path under the home dir to a leading `~`. */
+function tildify(p: string): string {
+  const home = homedir();
+  return p.startsWith(home) ? '~' + p.slice(home.length) : p;
+}
+
+/** Action for a marker-delimited section file (CLAUDE.md / Copilot / Codex),
+ *  mirroring upsertMarkedSection's decision so the preview can't lie. */
+export async function markedSectionAction(target: string): Promise<PlanAction> {
+  let content: string;
+  try {
+    content = await readFile(target, 'utf8');
+  } catch {
+    return 'create'; // file absent — upsert will create it
+  }
+  const bounds = findSectionBounds(content);
+  if (!bounds) return 'update'; // file exists, no section — upsert appends
+  const existing = content.substring(bounds.start, bounds.end);
+  if (existing === buildMarkedSection()) return 'unchanged';
+  // Drifted: refreshed only when bounded; legacy (unbounded) is left untouched.
+  return bounds.bounded ? 'update' : 'unchanged';
+}
+
+/** Action for the Cursor rule file. */
+async function cursorAction(projectDir: string): Promise<PlanAction> {
+  const target = join(projectDir, '.cursor', 'rules', 'starlog.mdc');
+  let existing: string | null = null;
+  try {
+    existing = await readFile(target, 'utf8');
+  } catch {
+    return 'create';
+  }
+  return existing === buildCursorMdc() ? 'unchanged' : 'update';
+}
+
+/** Action for the Claude Code MCP server entry in settings.json. */
+async function mcpServerAction(): Promise<PlanAction> {
+  const settings = await readSettingsJson();
+  const servers = (settings.mcpServers ?? {}) as Record<string, unknown>;
+  if (!('starlog' in servers)) return 'create';
+  return JSON.stringify(servers.starlog) === JSON.stringify(desiredMcpServer())
+    ? 'unchanged'
+    : 'update';
+}
+
+/** Action for the PostToolUse hook (file on disk + settings.json registration). */
+async function hookAction(): Promise<PlanAction> {
+  let existing: string | null = null;
+  try {
+    existing = await readFile(HOOK_PATH, 'utf8');
+  } catch { /* absent */ }
+  const fileMatches = existing === generateHookScript();
+
+  const settings = await readSettingsJson();
+  const hooks = settings.hooks as { PostToolUse?: unknown[] } | undefined;
+  const registered = Array.isArray(hooks?.PostToolUse) && hooks!.PostToolUse.some((entry) => {
+    const e = entry as { hooks?: Array<{ command?: string }> };
+    return e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
+  });
+
+  if (fileMatches && registered) return 'unchanged';
+  return existing === null ? 'create' : 'update';
+}
+
+/** Build the full plan for an install run, honouring detection and --all/--project. */
+async function buildInstallPlan(
+  opts: InitOpts,
+  projectDir: string,
+): Promise<{ items: PlanItem[]; skipped: SkippedItem[] }> {
+  const items: PlanItem[] = [];
+  const skipped: SkippedItem[] = [];
+
+  items.push({
+    label: 'Claude Code · MCP server',
+    path: tildify(SETTINGS_PATH),
+    action: await mcpServerAction(),
+    apply: configureMcpServer,
+  });
+  items.push({
+    label: 'Claude Code · PostToolUse hook',
+    path: tildify(HOOK_PATH),
+    action: await hookAction(),
+    apply: installHookScript,
+  });
+
+  const detection = detectAgents({ projectDir });
+
+  if (opts.all || detection.cursor.detected) {
+    items.push({
+      label: 'Cursor · rule',
+      path: join(projectDir, '.cursor', 'rules', 'starlog.mdc'),
+      action: await cursorAction(projectDir),
+      apply: () => configureCursor(projectDir),
+    });
+  } else {
+    skipped.push({ label: 'Cursor', reason: detection.cursor.reason });
+  }
+
+  if (opts.all || detection.copilot.detected) {
+    items.push({
+      label: 'VS Code Copilot · instructions',
+      path: join(projectDir, '.github', 'copilot-instructions.md'),
+      action: await markedSectionAction(join(projectDir, '.github', 'copilot-instructions.md')),
+      apply: () => configureCopilot(projectDir),
+    });
+  } else {
+    skipped.push({ label: 'VS Code Copilot', reason: detection.copilot.reason });
+  }
+
+  if (opts.all || detection.codex.detected) {
+    items.push({
+      label: 'Codex · instructions',
+      path: join(projectDir, 'AGENTS.md'),
+      action: await markedSectionAction(join(projectDir, 'AGENTS.md')),
+      apply: () => configureCodex(projectDir),
+    });
+  } else {
+    skipped.push({ label: 'Codex', reason: detection.codex.reason });
+  }
+
+  if (opts.project) {
+    items.push({
+      label: 'CLAUDE.md · project instructions',
+      path: join(projectDir, 'CLAUDE.md'),
+      action: await markedSectionAction(join(projectDir, 'CLAUDE.md')),
+      apply: () => writeClaudeMd(projectDir),
+    });
+  }
+
+  return { items, skipped };
+}
+
+/** Prompt the user to confirm. Returns false on anything but an explicit yes. */
+async function confirmApply(): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question('\nApply these changes? [y/N] ')).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
 interface InitOpts {
   project?: boolean;
   uninstall?: boolean;
   all?: boolean;
+  yes?: boolean;
+  dryRun?: boolean;
 }
 
 export async function runInit(opts: InitOpts): Promise<void> {
@@ -513,69 +686,59 @@ export async function runInit(opts: InitOpts): Promise<void> {
     return;
   }
 
-  console.log('Starlog init — configuring AI coding agent integrations...\n');
+  const { items, skipped } = await buildInstallPlan(opts, projectDir);
+  const changes = items.filter((i) => i.action !== 'unchanged');
 
-  // Global: Claude Code (MCP server + hook)
-  console.log('  Claude Code (global):');
-  const mcp = await configureMcpServer();
-  console.log(mcp.changed
-    ? '    [+] MCP server configured in ~/.claude/settings.json'
-    : '    [=] MCP server already configured');
-
-  const hook = await installHookScript();
-  console.log(hook.changed
-    ? '    [+] PostToolUse hook installed (~/.claude/hooks/starlog-pkg-check.js)'
-    : '    [=] Hook already installed');
-
-  // Project-level agents: configure only the ones detected in this
-  // environment, unless --all is passed. Keeps init from littering a
-  // Claude-only repo with Cursor/Copilot/Codex files.
-  const detection = detectAgents({ projectDir });
-
-  console.log('  Cursor (project):');
-  let cursor = { changed: false };
-  if (opts.all || detection.cursor.detected) {
-    cursor = await configureCursor(projectDir);
-    console.log(cursor.changed
-      ? '    [+] Rule added (.cursor/rules/starlog.mdc)'
-      : '    [=] Already configured');
-  } else {
-    console.log(`    [-] Skipped — ${detection.cursor.reason} (use --all to force)`);
+  // ── Preview ──
+  console.log('Starlog init — planned changes:\n');
+  const mark: Record<PlanAction, string> = {
+    create: '[+ create]',
+    update: '[~ update]',
+    unchanged: '[= ok]    ',
+  };
+  for (const item of items) {
+    console.log(`  ${mark[item.action]} ${item.label}`);
+    console.log(`             ${item.path}`);
+  }
+  for (const s of skipped) {
+    console.log(`  [- skip]   ${s.label} — ${s.reason} (use --all to force)`);
   }
 
-  console.log('  VS Code Copilot (project):');
-  let copilot = { changed: false };
-  if (opts.all || detection.copilot.detected) {
-    copilot = await configureCopilot(projectDir);
-    console.log(copilot.changed
-      ? '    [+] Instructions added (.github/copilot-instructions.md)'
-      : '    [=] Already configured');
-  } else {
-    console.log(`    [-] Skipped — ${detection.copilot.reason} (use --all to force)`);
+  if (changes.length === 0) {
+    console.log('\nEverything is already configured. No changes needed.');
+    return;
   }
 
-  console.log('  Codex (project):');
-  let codex = { changed: false };
-  if (opts.all || detection.codex.detected) {
-    codex = await configureCodex(projectDir);
-    console.log(codex.changed
-      ? '    [+] Instructions added (AGENTS.md)'
-      : '    [=] Already configured');
-  } else {
-    console.log(`    [-] Skipped — ${detection.codex.reason} (use --all to force)`);
+  console.log(
+    `\n${changes.length} file${changes.length === 1 ? '' : 's'} will be written. ` +
+    'Nothing has been changed yet.',
+  );
+
+  // ── Dry run: stop before writing ──
+  if (opts.dryRun) {
+    console.log('Dry run — no changes written. Re-run without --dry-run to apply.');
+    return;
   }
 
-  // Optional: CLAUDE.md project instructions
-  if (opts.project) {
-    console.log('  CLAUDE.md (project):');
-    const md = await writeClaudeMd(projectDir);
-    console.log(md.changed
-      ? '    [+] Starlog instructions added to CLAUDE.md'
-      : '    [=] Already configured');
+  // ── Confirm ──
+  let proceed = opts.yes === true;
+  if (!proceed) {
+    if (!process.stdin.isTTY) {
+      console.log('\nNon-interactive shell — re-run with --yes to apply, or --dry-run to preview only.');
+      return;
+    }
+    proceed = await confirmApply();
+  }
+  if (!proceed) {
+    console.log('\nAborted. No changes made.');
+    return;
   }
 
-  const anyChanged = mcp.changed || hook.changed || cursor.changed || copilot.changed || codex.changed;
-  console.log(anyChanged
-    ? '\nDone! Restart your AI coding agent for changes to take effect.'
-    : '\nEverything was already configured. No changes made.');
+  // ── Apply ──
+  console.log('');
+  for (const item of changes) {
+    await item.apply();
+    console.log(`  [done] ${item.label}`);
+  }
+  console.log('\nDone! Restart your AI coding agent for changes to take effect.');
 }

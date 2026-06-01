@@ -95,8 +95,10 @@ program
   .description('Configure AI coding agents to use Starlog (MCP server, hooks, instructions)')
   .option('--project', 'Also add Starlog instructions to the current project CLAUDE.md')
   .option('--all', 'Configure all supported agents, even ones not detected in this environment')
+  .option('--dry-run', 'Preview the changes without writing anything')
+  .option('-y, --yes', 'Apply changes without the confirmation prompt (for CI/non-interactive use)')
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
-  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; uninstall?: boolean }) => {
+  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean }) => {
     await runInit(opts);
   }));
 
