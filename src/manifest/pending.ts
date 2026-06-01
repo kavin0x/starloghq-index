@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { atomicWrite } from '../fsutil.js';
 
 /**
  * A package detected by the PostToolUse hook that needs manifest generation.
@@ -48,8 +49,9 @@ export async function readQueue(queuePath: string): Promise<PendingEntry[]> {
  * Write a pending queue to disk, creating parent directories as needed.
  */
 export async function writeQueue(queuePath: string, entries: PendingEntry[]): Promise<void> {
-  await mkdir(dirname(queuePath), { recursive: true });
-  await writeFile(queuePath, JSON.stringify(entries, null, 2) + '\n', 'utf-8');
+  // Atomic temp+rename so a crash can't truncate the queue. (Note: this does
+  // not serialize concurrent writers — overlapping writes still last-writer-win.)
+  await atomicWrite(queuePath, JSON.stringify(entries, null, 2) + '\n');
 }
 
 /**

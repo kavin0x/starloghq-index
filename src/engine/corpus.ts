@@ -41,14 +41,25 @@ export async function loadCorpus(
 
     for (const file of jsonFiles) {
       const filePath = join(subdirPath, file);
-      const raw = await readFile(filePath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      const result = CapabilityManifestSchema.safeParse(parsed);
-
-      if (result.success) {
-        manifests.push(result.data);
+      // Per-file isolation: one unreadable/syntactically-broken/schema-invalid
+      // manifest must not abort the whole corpus load. Skip it and warn on
+      // stderr (stdout is reserved for CLI output and the MCP stdio protocol).
+      try {
+        const raw = await readFile(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        const result = CapabilityManifestSchema.safeParse(parsed);
+        if (result.success) {
+          manifests.push(result.data);
+        } else {
+          const summary = result.error.issues
+            .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+            .join('; ');
+          console.error(`[starlog] skipping invalid manifest ${filePath}: ${summary}`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[starlog] skipping unreadable manifest ${filePath}: ${msg}`);
       }
-      // Silently skip invalid manifests -- they'll fail schema validation
     }
   }
 

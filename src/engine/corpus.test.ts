@@ -128,16 +128,28 @@ describe('loadCorpus()', () => {
   });
 
   describe('error handling', () => {
-    it('throws SyntaxError when a file contains invalid JSON (known behavior: no try/catch in corpus.ts)', async () => {
-      // NOTE: corpus.ts does not wrap JSON.parse in a try/catch despite the comment saying
-      // "Silently skip invalid manifests". This test documents the actual behavior.
-      // The validator.ts (sync version) does handle this, but loadCorpus (async) does not.
+    it('skips a syntactically broken JSON file and still loads the good ones (M8)', async () => {
+      // A single malformed .json file must not abort the whole corpus load.
       const authDir = join(tmpRoot, 'authentication');
       await mkdir(authDir);
       await writeFile(join(authDir, 'broken.json'), 'not valid json {{', 'utf-8');
       await writeManifest(authDir, 'clerk.json', makeValidManifestJson({ id: 'clerk' }));
 
-      await expect(loadCorpus(tmpRoot)).rejects.toThrow(SyntaxError);
+      const results = await loadCorpus(tmpRoot);
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe('clerk');
+    });
+
+    it('skips multiple bad files (broken JSON + schema-invalid) and loads all valid ones', async () => {
+      const authDir = join(tmpRoot, 'authentication');
+      await mkdir(authDir);
+      await writeFile(join(authDir, 'broken.json'), '{ oops', 'utf-8');
+      await writeFile(join(authDir, 'wrongshape.json'), JSON.stringify({ id: 'x', category: 'nope' }), 'utf-8');
+      await writeManifest(authDir, 'clerk.json', makeValidManifestJson({ id: 'clerk' }));
+      await writeManifest(authDir, 'nextauth.json', makeValidManifestJson({ id: 'nextauth', name: 'NextAuth.js' }));
+
+      const results = await loadCorpus(tmpRoot);
+      expect(results.map((m) => m.id).sort()).toEqual(['clerk', 'nextauth']);
     });
 
     it('silently skips files that fail schema validation', async () => {

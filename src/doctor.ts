@@ -38,11 +38,28 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
-async function readJson(p: string): Promise<Record<string, unknown> | null> {
+/**
+ * Read + parse a JSON file, distinguishing "absent" from "present but invalid"
+ * so doctor can tell the difference between an unconfigured setup and a corrupt
+ * settings.json (which `starlog init` would otherwise choke on).
+ */
+export type JsonResult =
+  | { kind: 'ok'; data: Record<string, unknown> }
+  | { kind: 'absent' }
+  | { kind: 'invalid'; error: string };
+
+export async function readJson(p: string): Promise<JsonResult> {
+  let raw: string;
   try {
-    return JSON.parse(await readFile(p, 'utf8'));
-  } catch {
-    return null;
+    raw = await readFile(p, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'absent' };
+    return { kind: 'invalid', error: (err as Error).message };
+  }
+  try {
+    return { kind: 'ok', data: JSON.parse(raw) };
+  } catch (err) {
+    return { kind: 'invalid', error: (err as Error).message };
   }
 }
 
@@ -254,10 +271,18 @@ export async function runDoctor(): Promise<number> {
   const projectDir = process.cwd();
   console.log('Starlog doctor — checking your setup...\n');
 
-  const settings = await readJson(SETTINGS_PATH);
+  const settingsResult = await readJson(SETTINGS_PATH);
+  const settings = settingsResult.kind === 'ok' ? settingsResult.data : null;
 
   const checks: Check[] = [];
   checks.push(await checkCorpus());
+  if (settingsResult.kind === 'invalid') {
+    checks.push({
+      level: 'fail',
+      label: 'settings.json',
+      detail: `invalid JSON (${settingsResult.error}) — fix or remove ${SETTINGS_PATH}, then run \`starlog init\``,
+    });
+  }
   checks.push(...(await checkMcp(settings)));
   checks.push(...(await checkHook(settings)));
   checks.push(...(await checkProjectAgents(projectDir)));

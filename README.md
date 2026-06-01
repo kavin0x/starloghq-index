@@ -17,8 +17,8 @@ Starlog fixes this with structured capability manifests generated from code anal
 ## Quick start
 
 ```bash
-git clone https://github.com/starlog/mcp.git starlog
-cd starlog && npm install
+git clone https://github.com/starloghq/index.git starlog-index
+cd starlog-index && npm install
 ```
 
 ### One-command setup (recommended)

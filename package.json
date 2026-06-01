@@ -1,5 +1,5 @@
 {
-  "name": "starlog",
+  "name": "@starlog/index",
   "version": "0.1.0",
   "description": "Capability indexing layer for AI coding agents",
   "type": "module",

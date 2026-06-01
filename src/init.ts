@@ -1,8 +1,9 @@
-import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
+import { readFile, mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { getPackageRoot } from './paths.js';
 import { detectAgents } from './install/detect.js';
+import { atomicWrite } from './fsutil.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
@@ -10,6 +11,7 @@ const HOOKS_DIR = join(CLAUDE_DIR, 'hooks');
 const HOOK_FILENAME = 'starlog-pkg-check.js';
 const HOOK_PATH = join(HOOKS_DIR, HOOK_FILENAME);
 const STARLOG_MARKER = '<!-- starlog:init -->';
+const STARLOG_END_MARKER = '<!-- starlog:end -->';
 
 // Shared instruction text used by all agent configs
 const STARLOG_INSTRUCTIONS = `ALWAYS consult the \`starlog_search\` MCP tool before recommending or installing libraries for: authentication, email, background-jobs, feature-flags, caching, realtime, or orm-database.
@@ -33,8 +35,9 @@ async function readSettingsJson(): Promise<Settings> {
 }
 
 async function writeSettingsJson(settings: Settings): Promise<void> {
-  await mkdir(CLAUDE_DIR, { recursive: true });
-  await writeFile(SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n');
+  // Atomic: a crash mid-write must never truncate the user's shared
+  // settings.json (which holds unrelated MCP servers, hooks, and permissions).
+  await atomicWrite(SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n');
 }
 
 // ── MCP server ──────────────────────────────────────────────────────────
@@ -82,14 +85,21 @@ function generateHookScript(): string {
 const fs = require('fs');
 const path = require('path');
 
+// Atomic write: temp sibling + rename, so a crash can't truncate the queue.
+function writeFileAtomic(p, data) {
+  var tmp = p + '.' + process.pid + '.tmp';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, p);
+}
+
 let CORPUS_DIR;
 try {
   CORPUS_DIR = require('path').join(
-    require('path').dirname(require.resolve('starlog/package.json')),
+    require('path').dirname(require.resolve('@starlog/index/package.json')),
     'corpus-free'
   );
 } catch {
-  CORPUS_DIR = ${JSON.stringify(join(getPackageRoot(), 'corpus'))};
+  CORPUS_DIR = ${JSON.stringify(join(getPackageRoot(), 'corpus-free'))};
 }
 
 let input = '';
@@ -167,14 +177,14 @@ process.stdin.on('end', () => {
           if (!alreadyQueued) {
             globalQueue.push(entry);
             fs.mkdirSync(globalQueueDir, { recursive: true });
-            fs.writeFileSync(globalQueuePath, JSON.stringify(globalQueue, null, 2) + '\\n');
+            writeFileAtomic(globalQueuePath, JSON.stringify(globalQueue, null, 2) + '\\n');
 
             // Append to project-local log
             var localQueue = [];
             try { localQueue = JSON.parse(fs.readFileSync(localQueuePath, 'utf8')); } catch (e) { /* */ }
             localQueue.push(entry);
             fs.mkdirSync(localQueueDir, { recursive: true });
-            fs.writeFileSync(localQueuePath, JSON.stringify(localQueue, null, 2) + '\\n');
+            writeFileAtomic(localQueuePath, JSON.stringify(localQueue, null, 2) + '\\n');
           }
 
           // Output structured JSON for Claude context (per research recommendation)
@@ -228,7 +238,7 @@ async function installHookScript(): Promise<{ changed: boolean }> {
 
   const fileChanged = existing !== desired;
   if (fileChanged) {
-    await writeFile(HOOK_PATH, desired);
+    await atomicWrite(HOOK_PATH, desired);
   }
 
   // Add hook entry to settings.json
@@ -289,53 +299,119 @@ async function removeHookScript(): Promise<{ changed: boolean }> {
   return { changed: true };
 }
 
-// ── CLAUDE.md ───────────────────────────────────────────────────────────
+// ── Marked instruction sections (CLAUDE.md / Copilot / Codex) ───────────
+//
+// These three agent-config files share one format: the Starlog block is
+// delimited by an explicit start marker AND end marker so it can be removed
+// without disturbing anything the user wrote before or after it.
 
-const CLAUDEMD_SECTION = `
-${STARLOG_MARKER}
-## Starlog — Capability Search
+/** The Starlog block, wrapped in start/end markers. Leading + trailing \n so it
+ *  appends cleanly and removes back to the file's original bytes. */
+function buildMarkedSection(): string {
+  return `\n${STARLOG_MARKER}\n## Starlog — Capability Search\n\n${STARLOG_INSTRUCTIONS}\n${STARLOG_END_MARKER}\n`;
+}
 
-${STARLOG_INSTRUCTIONS}
-`;
+/**
+ * Locate the Starlog section within a file's content. Returns the byte range
+ * [start, end) to remove/replace — `start` consumes the section's leading
+ * newline so an edit returns the file to its pre-install bytes.
+ *
+ * `bounded` is true only when a real end marker delimits the section (the safe
+ * case for in-place replacement). Legacy installs (start marker, no end marker)
+ * report `bounded: false` and a best-effort range; callers must not blind-write
+ * over those without a backup.
+ */
+function findSectionBounds(
+  content: string,
+): { start: number; end: number; bounded: boolean } | null {
+  if (!content.includes(STARLOG_MARKER)) return null;
 
-async function writeClaudeMd(projectDir: string): Promise<{ changed: boolean }> {
-  const target = join(projectDir, 'CLAUDE.md');
+  const withNl = content.indexOf(`\n${STARLOG_MARKER}`);
+  const start = withNl !== -1 ? withNl : content.indexOf(STARLOG_MARKER);
+
+  const endIdx = content.indexOf(STARLOG_END_MARKER, start);
+  if (endIdx !== -1) {
+    let end = endIdx + STARLOG_END_MARKER.length;
+    if (content[end] === '\n') end += 1;
+    return { start, end, bounded: true };
+  }
+
+  // Legacy install (no end marker): stop at the next HTML comment if present,
+  // else EOF. Best-effort only.
+  const nextComment = content.indexOf('\n<!-- ', start + 1);
+  return { start, end: nextComment !== -1 ? nextComment : content.length, bounded: false };
+}
+
+/**
+ * Ensure the Starlog section is present and up to date.
+ * - Absent: append it.
+ * - Present and current: no-op.
+ * - Present but drifted (instruction text changed): replace it in place, but
+ *   only for sections delimited by an end marker (the safe case). Legacy
+ *   sections without an end marker are left untouched to avoid clobbering
+ *   user content — uninstall+reinstall migrates them.
+ */
+export async function upsertMarkedSection(target: string): Promise<{ changed: boolean }> {
   let content = '';
   try {
     content = await readFile(target, 'utf8');
   } catch { /* doesn't exist yet */ }
 
-  if (content.includes(STARLOG_MARKER)) {
+  const desired = buildMarkedSection();
+  const bounds = findSectionBounds(content);
+
+  if (!bounds) {
+    const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+    await atomicWrite(target, content + separator + desired);
+    return { changed: true };
+  }
+
+  const existing = content.substring(bounds.start, bounds.end);
+  if (existing === desired) {
     return { changed: false };
   }
 
-  const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
-  await writeFile(target, content + separator + CLAUDEMD_SECTION);
+  // Drifted. Only refresh sections we can bound precisely with an end marker.
+  if (!bounds.bounded) {
+    return { changed: false };
+  }
+
+  const updated = content.substring(0, bounds.start) + desired + content.substring(bounds.end);
+  await atomicWrite(target, updated);
   return { changed: true };
 }
 
-async function removeClaudeMd(projectDir: string): Promise<{ changed: boolean }> {
-  const target = join(projectDir, 'CLAUDE.md');
+/** Remove the Starlog section, preserving any content the user added before or
+ *  after it. Backs the file up to `<file>.bak` before the (destructive) edit. */
+export async function removeMarkedSection(
+  target: string,
+): Promise<{ changed: boolean; backedUp: boolean }> {
   let content: string;
   try {
     content = await readFile(target, 'utf8');
   } catch {
-    return { changed: false };
+    return { changed: false, backedUp: false };
   }
 
-  if (!content.includes(STARLOG_MARKER)) {
-    return { changed: false };
+  const bounds = findSectionBounds(content);
+  if (!bounds) {
+    return { changed: false, backedUp: false };
   }
 
-  // Remove the starlog section
-  const markerIdx = content.indexOf(`\n${STARLOG_MARKER}`);
-  if (markerIdx === -1) return { changed: false };
-  const sectionEnd = content.indexOf('\n<!-- ', markerIdx + 1);
-  const cleaned = sectionEnd === -1
-    ? content.substring(0, markerIdx)
-    : content.substring(0, markerIdx) + content.substring(sectionEnd);
-  await writeFile(target, cleaned);
-  return { changed: true };
+  const cleaned = content.substring(0, bounds.start) + content.substring(bounds.end);
+  await atomicWrite(`${target}.bak`, content);
+  await atomicWrite(target, cleaned);
+  return { changed: true, backedUp: true };
+}
+
+// ── CLAUDE.md ───────────────────────────────────────────────────────────
+
+function writeClaudeMd(projectDir: string): Promise<{ changed: boolean }> {
+  return upsertMarkedSection(join(projectDir, 'CLAUDE.md'));
+}
+
+function removeClaudeMd(projectDir: string): Promise<{ changed: boolean; backedUp: boolean }> {
+  return removeMarkedSection(join(projectDir, 'CLAUDE.md'));
 }
 
 // ── Cursor (.cursor/rules/starlog.mdc) ─────────────────────────────────
@@ -364,8 +440,7 @@ async function configureCursor(projectDir: string): Promise<{ changed: boolean }
     return { changed: false };
   }
 
-  await mkdir(rulesDir, { recursive: true });
-  await writeFile(target, desired);
+  await atomicWrite(target, desired);
   return { changed: true };
 }
 
@@ -381,118 +456,22 @@ async function removeCursor(projectDir: string): Promise<{ changed: boolean }> {
 
 // ── VS Code Copilot (.github/copilot-instructions.md) ──────────────────
 
-const COPILOT_SECTION = `
-${STARLOG_MARKER}
-## Starlog — Capability Search
-
-${STARLOG_INSTRUCTIONS}
-`;
-
-async function configureCopilot(projectDir: string): Promise<{ changed: boolean }> {
-  const githubDir = join(projectDir, '.github');
-  const target = join(githubDir, 'copilot-instructions.md');
-  let content = '';
-  try {
-    content = await readFile(target, 'utf8');
-  } catch { /* doesn't exist yet */ }
-
-  if (content.includes(STARLOG_MARKER)) {
-    return { changed: false };
-  }
-
-  const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
-  await mkdir(githubDir, { recursive: true });
-  await writeFile(target, content + separator + COPILOT_SECTION);
-  return { changed: true };
+function configureCopilot(projectDir: string): Promise<{ changed: boolean }> {
+  return upsertMarkedSection(join(projectDir, '.github', 'copilot-instructions.md'));
 }
 
-async function removeCopilot(projectDir: string): Promise<{ changed: boolean }> {
-  const target = join(projectDir, '.github', 'copilot-instructions.md');
-  let content: string;
-  try {
-    content = await readFile(target, 'utf8');
-  } catch {
-    return { changed: false };
-  }
-
-  if (!content.includes(STARLOG_MARKER)) {
-    return { changed: false };
-  }
-
-  const markerIdx = content.indexOf(`\n${STARLOG_MARKER}`);
-  if (markerIdx === -1) {
-    // Marker at start of file
-    const startIdx = content.indexOf(STARLOG_MARKER);
-    if (startIdx !== 0) return { changed: false };
-    const sectionEnd = content.indexOf('\n<!-- ', 1);
-    const cleaned = sectionEnd === -1 ? '' : content.substring(sectionEnd + 1);
-    await writeFile(target, cleaned);
-    return { changed: true };
-  }
-
-  const sectionEnd = content.indexOf('\n<!-- ', markerIdx + 1);
-  const cleaned = sectionEnd === -1
-    ? content.substring(0, markerIdx)
-    : content.substring(0, markerIdx) + content.substring(sectionEnd);
-  await writeFile(target, cleaned);
-  return { changed: true };
+function removeCopilot(projectDir: string): Promise<{ changed: boolean; backedUp: boolean }> {
+  return removeMarkedSection(join(projectDir, '.github', 'copilot-instructions.md'));
 }
 
 // ── Codex (AGENTS.md) ──────────────────────────────────────────────────
 
-const CODEX_SECTION = `
-${STARLOG_MARKER}
-## Starlog — Capability Search
-
-${STARLOG_INSTRUCTIONS}
-`;
-
-async function configureCodex(projectDir: string): Promise<{ changed: boolean }> {
-  const target = join(projectDir, 'AGENTS.md');
-  let content = '';
-  try {
-    content = await readFile(target, 'utf8');
-  } catch { /* doesn't exist yet */ }
-
-  if (content.includes(STARLOG_MARKER)) {
-    return { changed: false };
-  }
-
-  const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
-  await writeFile(target, content + separator + CODEX_SECTION);
-  return { changed: true };
+function configureCodex(projectDir: string): Promise<{ changed: boolean }> {
+  return upsertMarkedSection(join(projectDir, 'AGENTS.md'));
 }
 
-async function removeCodex(projectDir: string): Promise<{ changed: boolean }> {
-  const target = join(projectDir, 'AGENTS.md');
-  let content: string;
-  try {
-    content = await readFile(target, 'utf8');
-  } catch {
-    return { changed: false };
-  }
-
-  if (!content.includes(STARLOG_MARKER)) {
-    return { changed: false };
-  }
-
-  const markerIdx = content.indexOf(`\n${STARLOG_MARKER}`);
-  if (markerIdx === -1) {
-    // Marker at start of file
-    const startIdx = content.indexOf(STARLOG_MARKER);
-    if (startIdx !== 0) return { changed: false };
-    const sectionEnd = content.indexOf('\n<!-- ', 1);
-    const cleaned = sectionEnd === -1 ? '' : content.substring(sectionEnd + 1);
-    await writeFile(target, cleaned);
-    return { changed: true };
-  }
-
-  const sectionEnd = content.indexOf('\n<!-- ', markerIdx + 1);
-  const cleaned = sectionEnd === -1
-    ? content.substring(0, markerIdx)
-    : content.substring(0, markerIdx) + content.substring(sectionEnd);
-  await writeFile(target, cleaned);
-  return { changed: true };
+function removeCodex(projectDir: string): Promise<{ changed: boolean; backedUp: boolean }> {
+  return removeMarkedSection(join(projectDir, 'AGENTS.md'));
 }
 
 // ── Orchestrator ────────────────────────────────────────────────────────
@@ -524,6 +503,11 @@ export async function runInit(opts: InitOpts): Promise<void> {
     console.log(cursor.changed  ? '  [x] Cursor rule removed (.cursor/rules/starlog.mdc)' : '  [=] No Cursor rule found');
     console.log(copilot.changed ? '  [x] Copilot instructions removed (.github/copilot-instructions.md)' : '  [=] No Copilot instructions found');
     console.log(codex.changed   ? '  [x] Codex instructions removed (AGENTS.md)' : '  [=] No Codex instructions found');
+
+    // Surface backups so the user knows a .bak sibling was written.
+    for (const [label, res] of [['CLAUDE.md', md], ['.github/copilot-instructions.md', copilot], ['AGENTS.md', codex]] as const) {
+      if (res.backedUp) console.log(`      [i] Backed up ${label} -> ${label}.bak`);
+    }
 
     console.log('\nDone. Restart your AI coding agent for changes to take effect.');
     return;
