@@ -21,7 +21,7 @@ Starlog is a local **capability index** for AI coding agents: a structured, quer
 - **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets ranked, structured answers instead of training-data recall.
 - **Package-install hook** — fires on `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces a library's `skip_when` conditions and alternatives *before* your agent commits to it.
 - **`starlog search` CLI** — query the same index directly from your terminal.
-- **Runs entirely on your machine** — the engine and corpus are local. No account, no key, no network call required.
+- **Runs on your machine** — the engine and corpus are local; searches need no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)
 
 ## Quick start
 
@@ -181,6 +181,8 @@ The bundled corpus covers 7 categories:
 
 Each manifest carries health signals (stars, downloads, last commit, contributors) and quality indicators (tests, docs, types, maintenance status).
 
+> **Note:** Manifest data (pricing, health stats, `skip_when`, alternatives) is **point-in-time and may be out of date or imperfect**. It's a decision aid, not ground truth — verify anything load-bearing, and corrections via PR are welcome.
+
 ## Testing
 
 ```bash
@@ -214,4 +216,4 @@ starlog <command> --no-telemetry   # one-off
 
 ## License
 
-Business Source License 1.1 — see [LICENSE](LICENSE). Source-available; converts to Apache-2.0 on the change date.
+**Source-available** under the Business Source License 1.1 — see [LICENSE](LICENSE). Not an OSI open-source license: free to use, modify, and self-host (non-competing use), and it **converts to Apache-2.0 on 2030-06-01**.

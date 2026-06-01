@@ -1,6 +1,6 @@
 {
   "name": "starloghq",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Better library decisions for your AI coding agent — a local MCP tool and package-install hook that indexes library capabilities. Free, no account.",
   "keywords": [
     "mcp",
