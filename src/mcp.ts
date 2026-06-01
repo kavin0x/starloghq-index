@@ -65,7 +65,7 @@ export function createServer(): McpServer {
       category: z.string().optional().describe(`Filter to a category. Known categories: ${KnownCategorySchema.options.join(', ')}. Any other string is accepted for dynamic categories (parity with the CLI).`),
       stack: z.string().optional().describe('Filter by stack affinity, e.g. "next.js", "python", "react"'),
       top_k: z.number().int().min(1).max(50).optional().describe('Max results to return, 1-50 (default 5)'),
-      diversity_lambda: z.number().min(0).max(1).optional().describe('Diversity-relevance tradeoff (0=max diversity, 1=pure relevance). Omit for pure relevance ranking.'),
+      diversity_lambda: z.number().min(0).max(1).optional().describe('Diversity-relevance tradeoff (0=max diversity, 1=pure relevance). Omit to use the default diversity rerank (0.5).'),
       context: z.string().optional().describe('Project context to unlock DIY-vs-buy analysis, e.g. "B2B SaaS on Next.js + Postgres, small team, needs SSO soon"'),
     },
     async (args) => {

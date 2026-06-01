@@ -58,17 +58,26 @@ export async function search(
     manifestMap.set(m.id, m);
   }
 
-  // Step 4.5: MMR diversity rerank (if enabled, per DIV-02).
-  // lambda >= 1.0 (or undefined) short-circuits MMR entirely and uses pure
-  // score-descending order — so lambda=1 means "no diversity," and mmrRerank's
-  // own internal default is intentionally unreachable via this public path (L14).
+  // Step 4.5: MMR diversity rerank — ON by default (Phase 0 trust-reset, per DIV-02).
+  // Default lambda = 0.5 (Phase 6-validated diversity/relevance balance). All callers
+  // (CLI, MCP, hosted search-service) flow through here, so the default applies
+  // everywhere. Pass diversityLambda >= 1.0 to opt out and get pure score-descending
+  // order (no diversity rerank).
+  const lambda = options.diversityLambda ?? 0.5;
   let ranked: SiftrankResult[];
-  if (options.diversityLambda !== undefined && options.diversityLambda < 1.0) {
-    ranked = mmrRerank(siftrankResults, manifestMap, options.diversityLambda);
+  if (lambda < 1.0) {
+    ranked = mmrRerank(siftrankResults, manifestMap, lambda);
   } else {
     ranked = [...siftrankResults].sort((a, b) => b.score - a.score);
   }
   const topResults = ranked.slice(0, topK);
+
+  // MMR reorders by *marginal* relevance, which would print the score column out
+  // of order (e.g. a diverse pick scoring 44 sitting above a 60). Treat diversity
+  // as a selection step: keep the diverse top-k MMR chose, but present them
+  // highest-score-first so the displayed scores are always monotonic. (For
+  // lambda>=1 the set is already score-descending, so this is a no-op there.)
+  topResults.sort((a, b) => b.score - a.score);
 
   // Step 6: Generate vs_custom + tradeoffs via LLM (QENG-03, QENG-04)
   let analysisMap = new Map<string, { vs_custom: string; context_fit: string; tradeoffs: string[] }>();

@@ -59,7 +59,7 @@ program
   .option('--top-k <n>', 'Number of results', '5')
   .option('--stack <stack>', 'Stack affinity filter (e.g., "next.js")')
   .option('--context <desc>', 'Project context for vs_custom analysis')
-  .option('--diversity <lambda>', 'Diversity-relevance tradeoff (0=max diversity, 1=pure relevance, default: no MMR)', parseFloat)
+  .option('--diversity <lambda>', 'Diversity-relevance tradeoff (0=max diversity, 1=pure relevance; default: 0.5 MMR on)', parseFloat)
   .action(action('search failed', async (query: string, opts: Record<string, string>) => {
     // Validate category -- warn for unknown categories but still search (D-04)
     if (opts.category && !VALID_CATEGORIES.includes(opts.category as any)) {

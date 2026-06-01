@@ -318,6 +318,7 @@ describe('search()', () => {
       const scoreMap = { clerk: 90, nextauth: 70, passport: 50, 'custom-authentication': 30 };
       const results = await search('auth', allManifests, {
         category: 'authentication',
+        diversityLambda: 1, // opt out of the default MMR rerank to assert pure score-descending order
       }, { siftrank: createMockSiftrank(scoreMap), llm: createMockLlm() });
 
       for (let i = 1; i < results.length; i++) {

@@ -5,7 +5,7 @@ export interface SearchOptions {
   stack?: string;          // e.g., "next.js", "python"
   topK?: number;           // default 5
   projectContext?: string; // for vs_custom generation
-  diversityLambda?: number; // 0-1, default undefined (no MMR). 0=max diversity, 1=pure relevance. Per D-07.
+  diversityLambda?: number; // 0-1, default 0.5 (MMR ON, Phase 6-validated). 0=max diversity, 1=pure relevance (opt out). Per D-07 + Phase 0 trust-reset.
 }
 
 export interface SiftrankResult {
