@@ -1,0 +1,58 @@
+name: Publish
+
+# Publishes to npm via Trusted Publishing (OIDC) when a v* tag is pushed.
+# No long-lived token is stored anywhere — GitHub Actions authenticates to npm
+# over OIDC, and npm verifies this repo + workflow. Provenance is automatic.
+#
+# One-time setup on npmjs.com: package starloghq → Settings → Trusted Publisher
+#   Organization/user: starloghq   Repository: index   Workflow: publish.yml
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # required for npm OIDC trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x # >= 22.14 required for trusted publishing
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Ensure npm >= 11.5.1 (trusted publishing)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Release gate — build, pack, smoke-test the tarball
+        run: |
+          npm run build
+          echo "TARBALL=$(npm pack | tail -1)" >> "$GITHUB_ENV"
+          echo "PKG_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Smoke-test the packed tarball
+        run: STARLOG_TARBALL="$GITHUB_WORKSPACE/$TARBALL" STARLOG_EXPECT_VERSION="$PKG_VERSION" bash scripts/smoke-test.sh
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          [ "$TAG" = "$PKG_VERSION" ] || { echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}"; exit 1; }
+
+      - name: Publish to npm (OIDC, with provenance)
+        run: npm publish

@@ -37,37 +37,44 @@ STARLOG_VERSION=0.1.1 npm run smoke             # a specific published version
 STARLOG_TARBALL=./starloghq-0.1.1.tgz npm run smoke
 ```
 
-## Release steps
+## Publishing — automated via Trusted Publishing (OIDC)
+
+Publishing is **automated**: pushing a `v*` tag triggers `.github/workflows/publish.yml`,
+which re-runs the gate and then `npm publish`. Authentication is GitHub Actions
+**OIDC** — there is **no npm token stored anywhere** (nothing to leak or rotate),
+and npm generates provenance automatically.
+
+One-time npm setup (already done): npmjs.com → package `starloghq` → **Settings →
+Trusted Publisher**, with Organization/user `starloghq`, Repository `index`,
+Workflow `publish.yml`, Allowed action `npm publish`.
+
+### Release steps
 
 1. Land all changes; `npm test` and `npm run typecheck` green.
-2. Bump the version **without** auto-tagging (we tag only after a green publish):
+2. Bump the version (no auto-tag — the workflow's tag-vs-`package.json` guard
+   would fail a mismatched tag):
    ```bash
-   npm version 0.1.1 --no-git-tag-version
+   npm version 0.1.2 --no-git-tag-version
    ```
-3. Commit the bump (and update any changelog).
-4. **Run the gate** — must be green:
+3. Commit the bump (and any changelog).
+4. **Run the gate locally** (optional but recommended — CI runs it too):
    ```bash
    npm run verify:release
    ```
-5. Publish. Publishing requires 2FA — a plain web login does **not** bypass it:
-   - **OTP:** `npm publish --otp=<6-digit-code>` from your authenticator, **or**
-   - **Token:** create a *granular* access token on npmjs.com with **Read and
-     write** on the `starloghq` package and **Bypass 2FA** enabled, then:
-     ```bash
-     umask 077; TMPRC=$(mktemp)
-     printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$TMPRC"
-     npm publish --userconfig "$TMPRC"; rm -f "$TMPRC"
-     ```
-     Revoke the token afterward. (For the *first ever* publish of a new package
-     the token must be scoped to **All packages**, since the name doesn't exist
-     yet to scope to.)
-6. Verify it's live: `npm view starloghq version`.
-7. **Now** tag and push (tagging after publish avoids a dangling tag if the auth
-   dance fails):
+5. Tag and push — this triggers the publish workflow:
    ```bash
-   git tag -a v0.1.1 -m "v0.1.1"
+   git tag -a v0.1.2 -m "v0.1.2"
    git push origin main --follow-tags
    ```
+6. Watch the run and confirm it's live:
+   ```bash
+   gh run watch
+   npm view starloghq version
+   ```
+
+If you ever need to publish **manually** (CI down): `npm publish --otp=<6-digit>`
+from an account with publish rights, or a short-lived granular token scoped to
+`starloghq` with bypass-2FA — then revoke it.
 
 ## Notes
 
