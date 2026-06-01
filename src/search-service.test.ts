@@ -62,15 +62,24 @@ describe('parseApiResults()', () => {
 
 describe('runSearch() API tier', () => {
   const origKey = process.env.STARLOG_API_KEY;
+  const origGopath = process.env.GOPATH;
   let errSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     process.env.STARLOG_API_KEY = 'test-key';
+    // Force the siftrank binary lookup to miss so the local fallback uses the
+    // keyword ranker instantly. Otherwise, on a machine that happens to have
+    // siftrank installed, these tests spawn the real binary (and may hit the
+    // network), making them slow and flaky -- and breaking the "no external
+    // binaries" invariant the suite is supposed to hold.
+    process.env.GOPATH = '/nonexistent-starlog-test-gopath';
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
   afterEach(() => {
     if (origKey === undefined) delete process.env.STARLOG_API_KEY;
     else process.env.STARLOG_API_KEY = origKey;
+    if (origGopath === undefined) delete process.env.GOPATH;
+    else process.env.GOPATH = origGopath;
     vi.unstubAllGlobals();
     errSpy.mockRestore();
   });

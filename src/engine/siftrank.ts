@@ -61,17 +61,152 @@ export function createSiftrankFn(): SiftrankFn {
   };
 }
 
-// Keyword fallback ranker -- used when the siftrank binary / OPENROUTER_API_KEY
-// is unavailable. Matches query terms against name + solves + best_for + stack.
-const keywordSiftrank: SiftrankFn = async (manifests, query) => {
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  return manifests.map((m, i) => {
-    const text = [m.name, m.solves, ...m.best_for, ...m.stack_affinity].join(' ').toLowerCase();
-    const score = terms.reduce((s, t) => s + (text.includes(t) ? 25 : 0), 0);
-    // rank is 1-based to match the Go siftrank path and the test mocks (L11);
-    // search re-sorts by score regardless, so this is purely for consistency.
-    return { key: m.id, value: m.name, object: {} as Record<string, unknown>, score: Math.min(score, 100), exposure: 1, rank: i + 1 };
+// Filler words that carry no ranking signal in a capability query. Kept small
+// and dev-flavored: terms like "build", "app", or "using" match nearly every
+// manifest, so counting them flattens the ranking into ties and lets
+// off-category libraries surface on incidental hits.
+const QUERY_STOPWORDS = new Set([
+  'a', 'an', 'the', 'for', 'to', 'of', 'in', 'on', 'with', 'and', 'or', 'my',
+  'your', 'i', 'we', 'is', 'are', 'be', 'that', 'this', 'it', 'as', 'at', 'by',
+  'app', 'apps', 'application', 'applications', 'using', 'use', 'build',
+  'building', 'need', 'want', 'add', 'adding', 'set', 'setup', 'how', 'best',
+  'good', 'some', 'something', 'library', 'libraries', 'package',
+]);
+
+// Canonicalize a token for comparison: lowercase and drop non-alphanumerics so
+// "Next.js", "next-js", and "nextjs" all compare equal.
+function canon(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+// Split a field into canonical tokens. Dots are kept through the split so
+// "next.js" stays one token before canon collapses it to "nextjs".
+function tokenizeField(s: string): string[] {
+  return s
+    .toLowerCase()
+    .split(/[^a-z0-9.]+/)
+    .map(canon)
+    .filter(Boolean);
+}
+
+// Strength of a single query term against one field's tokens: exact token hit
+// is full weight; prefix overlaps (query "auth" vs token "authentication", or
+// vice-versa) count partially. Length guards stop one- and two-letter stems
+// from matching unrelated tokens.
+function fieldMatch(tokens: string[], term: string): number {
+  let best = 0;
+  for (const tok of tokens) {
+    if (tok === term) return 1;
+    if (term.length >= 3 && tok.startsWith(term)) best = Math.max(best, 0.7);
+    else if (tok.length >= 3 && term.startsWith(tok)) best = Math.max(best, 0.6);
+  }
+  return best;
+}
+
+// A hit in the library's name or category says far more about fitness than an
+// incidental hit in its stack list, so fields are weighted, not pooled.
+const FIELD_WEIGHTS: Array<['name' | 'category' | 'solves' | 'best_for' | 'stack', number]> = [
+  ['name', 3],
+  ['category', 2.5],
+  ['solves', 2],
+  ['best_for', 1.5],
+  ['stack', 1],
+];
+
+/**
+ * Keyword fallback ranker -- used when the siftrank binary / OPENROUTER_API_KEY
+ * is unavailable. Exported for direct unit testing.
+ *
+ * Scoring, term by term: inverse-document-frequency (distinctive terms like
+ * "auth" outweigh corpus-common ones) times a field-weighted sum of match
+ * strength. Raw scores are normalized so the best match is 100.00 and the rest
+ * fall off proportionally -- no flat ties, and off-category libraries that only
+ * match filler terms sink to the bottom. A bounded health nudge separates
+ * genuine ties without ever reordering across a real relevance gap.
+ */
+export const keywordSiftrank: SiftrankFn = async (manifests, query) => {
+  const terms = [...new Set(tokenizeField(query))].filter(
+    (t) => t.length >= 2 && !QUERY_STOPWORDS.has(t),
+  );
+
+  // Tokenize each manifest's fields once, indexed parallel to `manifests`.
+  const fields = manifests.map((m) => ({
+    name: tokenizeField(m.name),
+    category: tokenizeField(m.category),
+    solves: tokenizeField(m.solves),
+    best_for: tokenizeField(m.best_for.join(' ')),
+    stack: tokenizeField(m.stack_affinity.join(' ')),
+  }));
+
+  // Document frequency per term -> inverse-frequency weight. A term matching
+  // few manifests is a strong signal; one matching many is weak.
+  const N = manifests.length;
+  const idf = new Map<string, number>();
+  for (const t of terms) {
+    let df = 0;
+    for (const f of fields) {
+      if (FIELD_WEIGHTS.some(([k]) => fieldMatch(f[k], t) > 0)) df++;
+    }
+    idf.set(t, Math.log(1 + N / (1 + df)));
+  }
+
+  const scored = manifests.map((m, i) => {
+    const f = fields[i];
+    let raw = 0;
+    // Track whether the match touched a capability field (name/category/solves/
+    // best_for) and not just stack_affinity. A library that matches only on
+    // stack ("next.js") is an off-topic coincidence -- e.g. an email SDK
+    // surfacing for an auth query because both target Next.js.
+    let onTopic = false;
+    for (const t of terms) {
+      let fieldSum = 0;
+      for (const [k, w] of FIELD_WEIGHTS) {
+        const strength = fieldMatch(f[k], t);
+        if (strength > 0) {
+          fieldSum += w * strength;
+          if (k !== 'stack') onTopic = true;
+        }
+      }
+      raw += (idf.get(t) ?? 0) * fieldSum;
+    }
+    if (raw > 0) {
+      // Tiny tie-breaker (max ~0.07 for a 10M-download lib) so equally-relevant
+      // libraries separate and the healthier one edges ahead.
+      const popularity = m.health.weekly_downloads ?? m.health.stars ?? 0;
+      raw += Math.log10(1 + popularity) * 0.01;
+    }
+    return { manifest: m, raw, onTopic };
   });
+
+  const max = Math.max(0, ...scored.map((s) => s.raw));
+  let ranked = scored
+    .map((s) => ({
+      key: s.manifest.id,
+      value: s.manifest.name,
+      object: {} as Record<string, unknown>,
+      score: max > 0 ? Math.round((s.raw / max) * 10000) / 100 : 0,
+      exposure: 1,
+      rank: 0,
+      onTopic: s.onTopic,
+    }))
+    // Relevance floor: drop weak matches below ~35% of the top score.
+    // Normalization pins the best match at 100, so this is "barely a third as
+    // relevant as the best hit" -- the noisy tail where a result matched only a
+    // single common term (e.g. an off-category lib that happens to mention
+    // "next.js") while the best hit matched the distinctive head term too.
+    .filter((r) => r.score >= 35);
+
+  // Prefer capability ("on-topic") matches; fall back to stack-only matches
+  // only when nothing matched a capability field, so a pure stack query
+  // ("next.js libraries") still returns something useful instead of nothing.
+  const onTopicHits = ranked.filter((r) => r.onTopic);
+  if (onTopicHits.length > 0) ranked = onTopicHits;
+
+  return ranked
+    // search() re-sorts by score, but ranking here keeps the rank field honest
+    // and matches the real Go siftrank's contract (1-based, score-descending).
+    .sort((a, b) => b.score - a.score)
+    .map(({ onTopic: _onTopic, ...r }, i) => ({ ...r, rank: i + 1 }));
 };
 
 // Emit the fallback notice at most once per process. stderr only -- stdout
@@ -92,14 +227,22 @@ export function createResilientSiftrankFn(): SiftrankFn {
     } catch (err) {
       if (!warnedFallback) {
         warnedFallback = true;
-        // execFile errors embed the subprocess's full stderr; keep only the
-        // first line so a verbose ranker log can't flood our stderr.
         const raw = err instanceof Error ? err.message : String(err);
-        const msg = raw.split('\n')[0].slice(0, 200);
-        console.error(
-          `[starlog] LLM ranking unavailable (${msg}); falling back to keyword ranking. ` +
-          `Install the siftrank binary and set OPENROUTER_API_KEY for ranked results.`,
-        );
+        // A missing binary (ENOENT) is the ordinary default — no siftrank
+        // installed — so frame keyword ranking as a first-class mode, not a
+        // failure. A binary that is present but errored is unexpected, so keep
+        // the first line of its cause to aid debugging.
+        if (/ENOENT/.test(raw)) {
+          console.error(
+            '[starlog] Using local keyword ranking. ' +
+            'For semantic (LLM) ranking, install siftrank and set OPENROUTER_API_KEY.',
+          );
+        } else {
+          const msg = raw.split('\n')[0].slice(0, 200);
+          console.error(
+            `[starlog] siftrank ranking failed (${msg}); using local keyword ranking instead.`,
+          );
+        }
       }
       return keywordSiftrank(manifests, query);
     }
