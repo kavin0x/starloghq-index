@@ -1,0 +1,63 @@
+{
+  "id": "nodemailer",
+  "name": "Nodemailer",
+  "repo": "nodemailer/nodemailer",
+  "ecosystem": "npm",
+  "category": "email",
+  "solves": "Sends emails from Node.js applications over SMTP, sendmail, AWS SES, or custom transports, handling MIME message construction, DKIM signing, attachments, HTML content, OAuth2 authentication, and connection pooling.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "fastify",
+    "nest.js",
+    "koa",
+    "hapi"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Sending transactional emails via your own SMTP server or existing email provider from any Node.js backend",
+    "Apps that need DKIM signing, attachments, HTML emails, and full control over SMTP configuration without a third-party email API",
+    "Projects using AWS SES that want a familiar Node.js API wrapper with connection pooling and message composition",
+    "Self-hosted or on-premise deployments where you cannot use external email SaaS providers",
+    "Prototyping and development with Ethereal test accounts for email previewing without real delivery"
+  ],
+  "skip_when": [
+    "You need a managed email delivery service with built-in analytics, bounce handling, and deliverability optimization out of the box",
+    "Your project requires email template management, A/B testing, or marketing automation features",
+    "You want a REST API-based email service without managing SMTP connections or transport configuration",
+    "You are building a serverless application where persistent SMTP connections are impractical and a stateless HTTP-based email API is preferable",
+    "You need guaranteed deliverability with dedicated IP warming and reputation management handled for you"
+  ],
+  "hosted_alternative": {
+    "name": "SendGrid",
+    "manifest_id": "sendgrid",
+    "pricing_summary": "Free tier: 100 emails/day; Essentials from $19.95/mo for 50k emails"
+  },
+  "alternative_ids": [
+    "resend",
+    "sendgrid",
+    "postmark",
+    "mailgun",
+    "amazon-ses",
+    "sparkpost",
+    "plunk",
+    "mailtrap",
+    "custom-email",
+    "loops",
+    "react-email"
+  ],
+  "health": {
+    "stars": 17569,
+    "weekly_downloads": 15104877,
+    "last_commit": "2026-05-26T16:03:37Z",
+    "contributors": 129,
+    "license": "NOASSERTION",
+    "open_issues": 1
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": false,
+    "maintenance_status": "active"
+  }
+}

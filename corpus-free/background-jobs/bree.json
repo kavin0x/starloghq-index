@@ -1,0 +1,58 @@
+{
+  "id": "bree",
+  "name": "Bree",
+  "repo": "breejs/bree",
+  "ecosystem": "npm",
+  "category": "background-jobs",
+  "solves": "Provides a lightweight Node.js job scheduler that uses worker threads to run sandboxed background jobs with support for cron expressions, human-friendly time intervals, dates, async/await, retries, throttling, concurrency, and graceful shutdown — all without requiring Redis, MongoDB, or any external database for job state management.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "koa",
+    "lad"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Node.js applications needing cron-like scheduled jobs without external dependencies like Redis or MongoDB",
+    "Single-process applications that want worker-thread-based job isolation with sandboxed execution",
+    "Projects requiring human-friendly scheduling syntax like 'every 2 days' or 'at 10:15 am except on Tuesday'",
+    "Forward Email / Lad framework users who want a tightly integrated job scheduler",
+    "Lightweight background task scheduling where jobs are defined as files in a jobs directory"
+  ],
+  "skip_when": [
+    "You need distributed job processing across multiple servers or horizontally scaled workers",
+    "You require persistent job queues with guaranteed delivery, retry state, and dead-letter queues backed by Redis or a database",
+    "You need a hosted or managed workflow orchestration platform with dashboards and observability",
+    "Your application is serverless or runs in ephemeral containers where in-process scheduling is unreliable",
+    "You need complex multi-step workflows with dependencies between jobs and fan-out/fan-in patterns"
+  ],
+  "hosted_alternative": {
+    "name": "Inngest",
+    "manifest_id": "inngest",
+    "pricing_summary": "Free tier with 5K runs/month, Pro from $50/month with higher limits"
+  },
+  "alternative_ids": [
+    "bullmq",
+    "agenda",
+    "node-cron",
+    "pg-boss",
+    "graphile-worker",
+    "bee-queue",
+    "quirrel",
+    "custom-background-jobs"
+  ],
+  "health": {
+    "stars": 3287,
+    "weekly_downloads": 40811,
+    "last_commit": "2026-02-17T22:09:07Z",
+    "contributors": 24,
+    "license": "MIT",
+    "open_issues": 29
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "maintained"
+  }
+}

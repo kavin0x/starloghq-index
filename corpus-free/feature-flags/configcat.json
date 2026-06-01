@@ -1,0 +1,55 @@
+{
+  "id": "configcat",
+  "name": "ConfigCat SDK for Node.js",
+  "repo": "configcat/node-sdk",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides a Node.js SDK client for the ConfigCat hosted feature flag and configuration management service, enabling remote feature toggling with user targeting, percentage rollouts, and multiple polling strategies without requiring self-hosted infrastructure.",
+  "stack_affinity": [
+    "node",
+    "express"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Teams wanting a hosted feature flag service that is simpler and cheaper than LaunchDarkly",
+    "Node.js backend services needing user-targeted feature flags with auto-polling, lazy loading, or manual polling modes",
+    "Applications requiring remote feature flag management via a dashboard without self-hosting any infrastructure",
+    "Projects needing custom caching strategies (e.g., Redis) for feature flag configuration data",
+    "Express or Node.js APIs that need real-time feature flag updates via webhooks or PubNub integration"
+  ],
+  "skip_when": [
+    "You need a self-hosted or open-source feature flag solution with no external service dependency",
+    "You want a free, unlimited feature flag system for a large team (ConfigCat is a paid hosted service beyond free tier)",
+    "You need client-side browser or React-specific feature flag SDKs (this is the Node.js server SDK)",
+    "You are starting a new project today (this SDK is in maintenance mode and superseded by configcat/js-unified-sdk)",
+    "You need feature flags tightly integrated with product analytics or experimentation platforms"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "launchdarkly",
+    "statsig",
+    "unleash",
+    "flagsmith",
+    "growthbook",
+    "split",
+    "posthog",
+    "flipt",
+    "openfeature",
+    "devcycle",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 22,
+    "weekly_downloads": 98255,
+    "last_commit": "2026-05-12T10:41:33Z",
+    "contributors": 14,
+    "license": "MIT",
+    "open_issues": 0
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

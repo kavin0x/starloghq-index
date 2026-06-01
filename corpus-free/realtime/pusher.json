@@ -1,0 +1,62 @@
+{
+  "id": "pusher",
+  "name": "Pusher Channels JavaScript Client",
+  "repo": "pusher/pusher-js",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides a client-side SDK for Pusher Channels, a hosted WebSocket-based pub/sub service, with automatic reconnection, fallback transports (XHR streaming, polling, SockJS), and support for public, private, presence, and encrypted channels.",
+  "stack_affinity": [
+    "react",
+    "angular",
+    "vue",
+    "next.js",
+    "node",
+    "express",
+    "web-workers",
+    "react-native"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Adding real-time notifications, chat, or live updates to web apps using a fully managed WebSocket service",
+    "Multi-framework projects (React, Angular, Vue, Node.js) that need a single consistent realtime client",
+    "Apps requiring presence channels to track which users are online in a room or collaboration feature",
+    "Projects that need encrypted end-to-end channels for sensitive real-time data",
+    "Rapidly prototyping real-time features without managing WebSocket infrastructure"
+  ],
+  "skip_when": [
+    "You need a self-hosted or open-source realtime server to avoid vendor lock-in to Pusher's hosted service",
+    "Your use case requires heavy bidirectional client-to-client messaging beyond Pusher's client event limitations",
+    "You need CRDT-based document collaboration or conflict resolution (use Yjs or Liveblocks instead)",
+    "Your project's budget cannot accommodate Pusher's per-connection/message pricing at scale",
+    "You only need simple server-to-server WebSocket connections without pub/sub channel semantics"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "socket-io",
+    "ably",
+    "supabase-realtime",
+    "sockjs",
+    "ws",
+    "centrifugo",
+    "mercure",
+    "custom-realtime",
+    "deepstream",
+    "liveblocks",
+    "mqtt",
+    "partykit"
+  ],
+  "health": {
+    "stars": 2218,
+    "weekly_downloads": 1789750,
+    "last_commit": "2026-05-28T15:05:39Z",
+    "contributors": 78,
+    "license": "MIT",
+    "open_issues": 11
+  },
+  "quality": {
+    "has_tests": false,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

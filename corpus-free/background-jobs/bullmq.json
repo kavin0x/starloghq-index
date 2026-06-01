@@ -1,0 +1,59 @@
+{
+  "id": "bullmq",
+  "name": "BullMQ",
+  "repo": "taskforcesh/bullmq",
+  "ecosystem": "both",
+  "category": "background-jobs",
+  "solves": "Provides a Redis-based distributed job queue and message processing system for Node.js and Python with support for job priorities, delayed jobs, rate limiting, repeatable jobs, parent-child job dependencies, and sandboxed workers, all backed by atomic Lua scripts for rock-solid reliability.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "nestjs",
+    "fastify",
+    "bun",
+    "python"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Distributed background job processing in Node.js/Python apps requiring Redis-backed reliability and atomicity",
+    "Complex job workflows with parent-child dependency trees using FlowProducer",
+    "Rate-limited or priority-based task queues where jobs need delayed execution, retries, and repeatable scheduling",
+    "NestJS applications needing a mature job queue via the official @nestjs/bullmq integration",
+    "High-throughput message processing pipelines requiring concurrency control, pause/resume, and global events"
+  ],
+  "skip_when": [
+    "Your project cannot run or manage a Redis instance as infrastructure",
+    "You need a fully managed hosted solution with zero infrastructure overhead",
+    "You only need simple periodic cron-like scheduling without queuing semantics",
+    "Your stack is serverless-first (e.g., Vercel/Cloudflare Workers) with no persistent worker processes",
+    "You prefer a PostgreSQL-backed queue to avoid adding Redis as a dependency"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "agenda",
+    "bee-queue",
+    "pg-boss",
+    "graphile-worker",
+    "inngest",
+    "trigger-dev",
+    "temporal",
+    "bree",
+    "custom-background-jobs",
+    "node-cron",
+    "quirrel"
+  ],
+  "health": {
+    "stars": 8938,
+    "weekly_downloads": 5560291,
+    "last_commit": "2026-05-28T17:13:45Z",
+    "contributors": 195,
+    "license": "MIT",
+    "open_issues": 392
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

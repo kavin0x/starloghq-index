@@ -1,0 +1,59 @@
+{
+  "id": "ably",
+  "name": "Ably Pub/Sub JavaScript SDK",
+  "repo": "ably/ably-js",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides a full-featured JavaScript client SDK for Ably's hosted realtime messaging platform, enabling pub/sub messaging, presence tracking, message history, push notifications, and LiveObjects state synchronization across browsers, Node.js, React, and React Native.",
+  "stack_affinity": [
+    "react",
+    "next.js",
+    "node",
+    "react-native",
+    "web-workers",
+    "typescript"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Apps requiring managed, globally-distributed realtime messaging with guaranteed delivery and ordering",
+    "React and Next.js projects needing built-in hooks (useChannel, usePresence, AblyProvider) for realtime features",
+    "Multi-platform projects targeting browser, Node.js, and React Native from a single SDK",
+    "Applications needing presence tracking, message history, and push notifications alongside pub/sub",
+    "Projects that need a tree-shakable modular SDK to minimize bundle size for browser deployments"
+  ],
+  "skip_when": [
+    "You need a self-hosted or open-source realtime server — Ably is a paid hosted service with no self-hosted option",
+    "Your project only needs simple WebSocket connections without pub/sub semantics or managed infrastructure",
+    "Budget is zero — Ably has a free tier but production usage requires a paid plan",
+    "You need peer-to-peer communication or CRDT-based collaborative editing rather than pub/sub messaging",
+    "You want to avoid vendor lock-in to a proprietary realtime messaging platform"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "pusher",
+    "socket-io",
+    "supabase-realtime",
+    "liveblocks",
+    "centrifugo",
+    "mercure",
+    "custom-realtime",
+    "ws",
+    "deepstream",
+    "mqtt",
+    "partykit",
+    "sockjs"
+  ],
+  "health": {
+    "stars": 360,
+    "last_commit": "2026-05-28T13:43:59Z",
+    "contributors": 49,
+    "license": "Apache-2.0",
+    "open_issues": 223
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

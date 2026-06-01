@@ -1,0 +1,54 @@
+{
+  "id": "cacheable",
+  "name": "Cacheable",
+  "repo": "jaredwray/cacheable",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides a comprehensive, modular caching framework for Node.js with layer 1 (in-memory) and layer 2 (persistent) tiered caching, built on top of Keyv, with packages for cache management, HTTP request caching, file caching, LRU memory caching, and memoization utilities.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "fastify",
+    "nestjs",
+    "keyv"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Node.js applications needing tiered L1/L2 caching with in-memory primary and Redis/database secondary stores",
+    "NestJS projects using cache-manager that need a maintained, modern cache-manager implementation",
+    "Applications requiring RFC-compliant HTTP request caching via cacheable-request",
+    "Projects needing a TypeScript-first drop-in replacement for node-cache with @cacheable/node-cache",
+    "Microservices that need flexible cache backends with Keyv adapter support and TTL management"
+  ],
+  "skip_when": [
+    "You only need a simple single-process LRU cache and want zero dependencies — use lru-cache instead",
+    "Your project is Python-based or non-Node.js",
+    "You need a distributed cache with built-in pub/sub and cluster support — use ioredis or Redis directly",
+    "You want a managed serverless caching service with zero infrastructure — consider Upstash Redis",
+    "Your caching needs are limited to browser/client-side storage rather than server-side"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "keyv",
+    "lru-cache",
+    "node-cache",
+    "unstorage",
+    "catbox",
+    "custom-caching",
+    "node-redis"
+  ],
+  "health": {
+    "stars": 1979,
+    "weekly_downloads": 7374082,
+    "last_commit": "2026-05-27T15:39:32Z",
+    "contributors": 96,
+    "license": "MIT",
+    "open_issues": 3
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": false,
+    "maintenance_status": "active"
+  }
+}

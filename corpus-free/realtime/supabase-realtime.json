@@ -1,0 +1,66 @@
+{
+  "id": "supabase-realtime",
+  "name": "Supabase Realtime",
+  "repo": "supabase/realtime",
+  "ecosystem": "both",
+  "category": "realtime",
+  "solves": "Provides WebSocket-based real-time functionality including broadcasting ephemeral messages between clients, tracking and synchronizing shared presence state, and streaming Postgres database changes (inserts, updates, deletes) to authorized clients.",
+  "stack_affinity": [
+    "next.js",
+    "react",
+    "vue",
+    "svelte",
+    "flutter",
+    "elixir",
+    "phoenix",
+    "supabase",
+    "node"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Supabase-based apps needing real-time database change notifications without polling",
+    "Collaborative apps requiring presence tracking (e.g., who's online, cursor positions)",
+    "Multiplayer features like shared cursors, live avatars, or typing indicators via ephemeral broadcast",
+    "Apps already using Supabase Auth and Postgres that want real-time features with row-level security",
+    "Building notification or activity feed systems triggered by Postgres row changes"
+  ],
+  "skip_when": [
+    "You need guaranteed message delivery — Supabase Realtime does not guarantee every message reaches every client",
+    "Your project has no Postgres database and you only need pub/sub between clients (consider Pusher, Ably, or Socket.IO instead)",
+    "You need sub-10ms ultra-low-latency messaging for gaming or trading (dedicated real-time brokers like Ably or custom WebSocket servers are better)",
+    "You want a lightweight self-contained WebSocket library without an opinionated backend stack (use ws or Socket.IO)",
+    "Your infrastructure cannot run the Elixir/Phoenix server and you don't want to use Supabase's hosted platform"
+  ],
+  "hosted_alternative": {
+    "name": "Supabase Platform",
+    "manifest_id": "supabase-realtime",
+    "pricing_summary": "Free tier includes 200 concurrent connections and 2M messages/month; Pro plan at $25/mo includes 500 connections and 5M messages; usage-based beyond that"
+  },
+  "alternative_ids": [
+    "pusher",
+    "socket-io",
+    "ably",
+    "liveblocks",
+    "partykit",
+    "centrifugo",
+    "deepstream",
+    "custom-realtime",
+    "ws",
+    "mercure",
+    "yjs"
+  ],
+  "health": {
+    "stars": 7568,
+    "weekly_downloads": 19940400,
+    "last_commit": "2026-05-28T20:24:25Z",
+    "contributors": 45,
+    "license": "Apache-2.0",
+    "open_issues": 66
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": false,
+    "maintenance_status": "active"
+  }
+}

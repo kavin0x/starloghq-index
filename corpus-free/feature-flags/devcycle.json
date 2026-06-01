@@ -1,0 +1,61 @@
+{
+  "id": "devcycle",
+  "name": "DevCycle JS SDKs",
+  "repo": "DevCycleHQ/js-sdks",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides client-side and server-side feature flag management SDKs for JavaScript, React, React Native, Next.js, Node.js, and NestJS, enabling real-time feature toggling with local bucketing and OpenFeature compatibility.",
+  "stack_affinity": [
+    "react",
+    "react-native",
+    "next.js",
+    "node",
+    "nestjs",
+    "expo",
+    "angular",
+    "cloudflare-workers"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Full-stack JavaScript projects needing feature flags across client, server, and mobile from one vendor",
+    "React or Next.js apps requiring real-time feature flag updates with SSE streaming",
+    "Teams wanting OpenFeature-compatible feature flags with migration strategies for gradual adoption",
+    "NestJS applications needing dependency-injected feature flag management",
+    "React Native and Expo mobile apps requiring cross-platform feature flag support"
+  ],
+  "skip_when": [
+    "You need a fully self-hosted or open-source feature flag solution without vendor dependency",
+    "Your stack is primarily Python, Go, or non-JavaScript and you want a single unified SDK",
+    "You want a free feature flag service with no usage limits — DevCycle is a commercial SaaS product",
+    "You only need simple boolean toggles and want zero external dependencies or API calls",
+    "Your project requires on-premise deployment with no external network calls"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "launchdarkly",
+    "statsig",
+    "unleash",
+    "flagsmith",
+    "growthbook",
+    "split",
+    "posthog",
+    "flipt",
+    "openfeature",
+    "configcat",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 38,
+    "weekly_downloads": 30104,
+    "last_commit": "2026-05-26T15:16:05Z",
+    "contributors": 23,
+    "license": "MIT",
+    "open_issues": 9
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

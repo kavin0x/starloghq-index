@@ -1,0 +1,62 @@
+{
+  "id": "resend",
+  "name": "Resend Node.js SDK",
+  "repo": "resend/resend-node",
+  "ecosystem": "npm",
+  "category": "email",
+  "solves": "Provides a TypeScript-first Node.js SDK for the Resend email API, enabling transactional and marketing email sending with support for React email templates, batch sending, webhooks, contacts/audiences management, and automation workflows.",
+  "stack_affinity": [
+    "next.js",
+    "remix",
+    "nuxt",
+    "express",
+    "hono",
+    "astro",
+    "redwoodjs",
+    "bun",
+    "node",
+    "react"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Transactional email in Next.js or React-based apps using JSX email templates",
+    "Startups and indie projects wanting a modern developer-friendly email API with minimal setup",
+    "Batch email sending with built-in contact and audience management",
+    "Applications that need webhook-based email event tracking (delivery, bounces, opens)",
+    "Teams wanting a fully typed TypeScript email SDK with first-class React email support"
+  ],
+  "skip_when": [
+    "You need a self-hosted or open-source email sending infrastructure with no vendor lock-in",
+    "You require SMTP relay or direct SMTP integration rather than an HTTP API",
+    "Your project needs to stay within a completely free tier — Resend's free plan has sending limits",
+    "You want a multi-provider email abstraction layer that can switch between SendGrid, SES, etc.",
+    "You are working in a non-Node.js backend — use Resend's Python, Go, Ruby, or Java SDKs instead"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "sendgrid",
+    "nodemailer",
+    "postmark",
+    "mailgun",
+    "amazon-ses",
+    "react-email",
+    "plunk",
+    "mailtrap",
+    "loops",
+    "custom-email",
+    "sparkpost"
+  ],
+  "health": {
+    "stars": 912,
+    "last_commit": "2026-05-28T22:07:41Z",
+    "contributors": 46,
+    "license": "MIT",
+    "open_issues": 16
+  },
+  "quality": {
+    "has_tests": false,
+    "has_docs": false,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

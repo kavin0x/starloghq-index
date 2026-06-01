@@ -1,0 +1,67 @@
+{
+  "id": "socket-io",
+  "name": "Socket.IO",
+  "repo": "socketio/socket.io",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides bidirectional, event-driven communication between browser clients and servers with automatic transport fallback (WebSocket, HTTP long-polling, WebTransport), reconnection logic, room-based broadcasting, and multiplexing via namespaces.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "koa",
+    "fastify",
+    "next.js",
+    "deno",
+    "bun",
+    "uwebsockets.js"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Real-time chat applications requiring rooms, presence, and message acknowledgments",
+    "Live dashboards and collaborative editing where server pushes updates to specific client groups",
+    "Multiplayer browser games needing low-latency bidirectional event-based messaging",
+    "Applications behind restrictive corporate proxies where WebSocket may be blocked and transport fallback is essential",
+    "Event-driven architectures requiring typed namespaces, middleware pipelines, and structured client-server contracts"
+  ],
+  "skip_when": [
+    "You only need server-to-client streaming and Server-Sent Events (SSE) would suffice",
+    "You need a standards-based WebSocket connection without proprietary protocol overhead for interoperability with non-Socket.IO clients",
+    "You are deploying on serverless/edge functions (Vercel, Cloudflare Workers) where persistent connections are not supported",
+    "You prefer a fully managed realtime service with guaranteed uptime SLAs and zero infrastructure management",
+    "You need MQTT or other IoT-specific protocols for device-to-device communication"
+  ],
+  "hosted_alternative": {
+    "name": "Pusher",
+    "manifest_id": "pusher",
+    "pricing_summary": "Free tier with 200k messages/day and 100 concurrent connections; paid plans from $49/mo scaling with connections and messages"
+  },
+  "alternative_ids": [
+    "pusher",
+    "ably",
+    "ws",
+    "sockjs",
+    "centrifugo",
+    "mercure",
+    "deepstream",
+    "supabase-realtime",
+    "custom-realtime",
+    "liveblocks",
+    "mqtt",
+    "partykit",
+    "yjs"
+  ],
+  "health": {
+    "stars": 63105,
+    "weekly_downloads": 13741434,
+    "last_commit": "2026-05-28T17:11:10Z",
+    "contributors": 403,
+    "license": "MIT",
+    "open_issues": 209
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

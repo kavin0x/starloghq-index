@@ -1,0 +1,66 @@
+{
+  "id": "drizzle",
+  "name": "Drizzle ORM",
+  "repo": "drizzle-team/drizzle-orm",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a lightweight, type-safe TypeScript ORM that maps closely to SQL syntax, supporting PostgreSQL, MySQL, and SQLite across serverless and traditional runtimes with zero dependencies and minimal bundle size.",
+  "stack_affinity": [
+    "node",
+    "bun",
+    "deno",
+    "next.js",
+    "cloudflare-workers",
+    "supabase",
+    "vercel",
+    "express",
+    "fastify",
+    "hono",
+    "remix",
+    "astro",
+    "sveltekit"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "TypeScript-first projects that want SQL-like query building with full type safety",
+    "Serverless and edge deployments where bundle size and cold start time matter",
+    "Projects using multiple database providers (PostgreSQL, MySQL, SQLite) that want a unified ORM API",
+    "Teams that prefer writing queries close to raw SQL but with type inference and schema declarations in code",
+    "Applications targeting Cloudflare Workers, Vercel Edge Functions, or other edge runtimes where traditional ORMs fail"
+  ],
+  "skip_when": [
+    "You need a mature, battle-tested migration system with long production history (Prisma or Knex may be more proven)",
+    "Your team prefers ActiveRecord-style ORM patterns with rich model instances and lifecycle hooks",
+    "You are building a Python or non-JavaScript/TypeScript backend",
+    "You need extensive built-in support for MongoDB or other NoSQL databases",
+    "Your project is a simple script that only needs a raw query runner without schema management"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "prisma",
+    "typeorm",
+    "sequelize",
+    "knex",
+    "mikro-orm",
+    "kysely",
+    "objection",
+    "better-sqlite3",
+    "custom-orm",
+    "postgres-js",
+    "slonik"
+  ],
+  "health": {
+    "stars": 34570,
+    "weekly_downloads": 9600811,
+    "last_commit": "2026-05-28T06:39:08Z",
+    "contributors": 123,
+    "license": "Apache-2.0",
+    "open_issues": 1804
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

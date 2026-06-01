@@ -1,0 +1,66 @@
+{
+  "id": "kysely",
+  "name": "Kysely",
+  "repo": "kysely-org/kysely",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a type-safe, autocompletion-friendly SQL query builder for TypeScript that infers column names, aliases, and result types at compile time, giving you the power of raw SQL with full type safety and no code generation step at query time.",
+  "stack_affinity": [
+    "node",
+    "deno",
+    "bun",
+    "cloudflare-workers",
+    "next.js",
+    "express",
+    "fastify",
+    "koa",
+    "postgresql",
+    "mysql",
+    "sqlite",
+    "mssql",
+    "pglite"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "TypeScript projects that need type-safe SQL queries without the abstraction overhead of a full ORM",
+    "Teams migrating from Knex.js who want compile-time type safety for their existing SQL-style queries",
+    "Serverless and edge deployments (Cloudflare Workers, Deno Deploy) where a lightweight query builder is preferred over a heavy ORM",
+    "Projects using multiple SQL databases (PostgreSQL, MySQL, SQLite, MSSQL) that want a single consistent query builder API",
+    "Applications where developers want to write SQL-like code with full IDE autocompletion and type inference for joins, subqueries, and CTEs"
+  ],
+  "skip_when": [
+    "You need automatic model relationships, lazy loading, and entity management typical of full ORMs like Prisma or TypeORM",
+    "Your team prefers a schema-first approach with automatic migration generation from model definitions",
+    "You are working in a plain JavaScript project without TypeScript, since Kysely's main value proposition is type safety",
+    "You want a zero-configuration ORM that handles database schema introspection and generates types automatically without any setup",
+    "Your project primarily uses MongoDB or other NoSQL databases"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "drizzle",
+    "prisma",
+    "typeorm",
+    "knex",
+    "slonik",
+    "postgres-js",
+    "sequelize",
+    "mikro-orm",
+    "objection",
+    "better-sqlite3",
+    "custom-orm"
+  ],
+  "health": {
+    "stars": 13880,
+    "weekly_downloads": 5962725,
+    "last_commit": "2026-05-28T07:56:57Z",
+    "contributors": 155,
+    "license": "MIT",
+    "open_issues": 162
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

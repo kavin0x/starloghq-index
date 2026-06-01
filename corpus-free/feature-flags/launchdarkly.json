@@ -1,0 +1,64 @@
+{
+  "id": "launchdarkly",
+  "name": "LaunchDarkly JavaScript SDKs",
+  "repo": "launchdarkly/js-core",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides official JavaScript/TypeScript SDKs for the LaunchDarkly feature management platform, enabling feature flag evaluation, percentage rollouts, user targeting, and experimentation across server-side, client-side, edge, and mobile JavaScript environments.",
+  "stack_affinity": [
+    "node",
+    "react",
+    "react-native",
+    "cloudflare",
+    "vercel",
+    "fastly",
+    "akamai",
+    "svelte",
+    "shopify-oxygen",
+    "electron",
+    "browser"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Enterprise teams needing a fully managed feature flag platform with trillions-scale flag evaluation",
+    "Multi-platform JavaScript applications spanning server, browser, mobile, and edge runtimes that need consistent flag evaluation",
+    "Gradual feature rollouts with percentage-based targeting and user segmentation across complex deployment topologies",
+    "Teams already using or committed to the LaunchDarkly platform who need official, well-supported JavaScript SDKs",
+    "AI/LLM applications needing feature-flagged model configuration with built-in providers for OpenAI, LangChain, and Vercel AI"
+  ],
+  "skip_when": [
+    "You need a free or open-source self-hosted feature flag solution without vendor lock-in",
+    "Your project is small or budget-constrained and cannot justify LaunchDarkly's commercial pricing",
+    "You only need simple boolean toggles and don't require advanced targeting, experimentation, or analytics",
+    "You are building a Python-only or non-JavaScript backend and need a different language SDK",
+    "You want to own and operate your own feature flag infrastructure without depending on an external SaaS platform"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "statsig",
+    "unleash",
+    "flagsmith",
+    "growthbook",
+    "split",
+    "posthog",
+    "flipt",
+    "openfeature",
+    "devcycle",
+    "configcat",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 28,
+    "weekly_downloads": 1717238,
+    "last_commit": "2026-05-28T23:34:28Z",
+    "contributors": 39,
+    "license": "NOASSERTION",
+    "open_issues": 15
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "id": "inngest",
+  "name": "Inngest",
+  "repo": "inngest/inngest-js",
+  "ecosystem": "npm",
+  "category": "background-jobs",
+  "solves": "Provides durable execution, event-driven background jobs, scheduled/cron tasks, and step functions on serverless platforms without requiring any queue or worker infrastructure, using an HTTP-based invocation model.",
+  "stack_affinity": [
+    "next.js",
+    "nuxt",
+    "h3",
+    "nitro",
+    "express",
+    "redwood",
+    "remix",
+    "cloudflare-workers",
+    "deno",
+    "bun",
+    "node",
+    "vercel",
+    "netlify",
+    "aws-lambda"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Serverless applications needing background jobs without managing Redis, queues, or worker processes",
+    "Event-driven workflows with multi-step orchestration and automatic retries on platforms like Vercel or Netlify",
+    "Scheduled and cron jobs in serverless environments where traditional cron is unavailable",
+    "Fan-out processing where a single event triggers multiple functions across your application",
+    "Long-running, durable workflows with step functions that survive serverless execution timeouts"
+  ],
+  "skip_when": [
+    "You need a self-hosted, fully open-source queue with no external platform dependency",
+    "Your application runs on a persistent server and you want a simple in-process job queue like BullMQ or pg-boss",
+    "You need sub-second latency for job execution and cannot tolerate HTTP-based invocation overhead",
+    "You want to avoid vendor lock-in to a hosted orchestration platform",
+    "Your project is Python-only or outside the JavaScript/TypeScript ecosystem"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "bullmq",
+    "trigger-dev",
+    "temporal",
+    "pg-boss",
+    "graphile-worker",
+    "quirrel",
+    "bee-queue",
+    "custom-background-jobs",
+    "node-cron",
+    "agenda"
+  ],
+  "health": {
+    "stars": 954,
+    "last_commit": "2026-05-28T13:47:42Z",
+    "contributors": 55,
+    "license": "GPL-3.0",
+    "open_issues": 119
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

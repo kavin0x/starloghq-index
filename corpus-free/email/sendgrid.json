@@ -1,0 +1,58 @@
+{
+  "id": "sendgrid",
+  "name": "SendGrid Node.js SDK",
+  "repo": "sendgrid/sendgrid-nodejs",
+  "ecosystem": "npm",
+  "category": "email",
+  "solves": "Provides a Node.js client for the Twilio SendGrid Web API v3, enabling transactional and marketing email sending, inbound email parsing, contact management, and event webhook validation through a modular monorepo of packages (@sendgrid/mail, @sendgrid/client, @sendgrid/inbound-mail-parser, @sendgrid/eventwebhook).",
+  "stack_affinity": [
+    "node",
+    "express",
+    "next.js",
+    "fastify",
+    "koa"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Transactional email sending (order confirmations, password resets) in Node.js apps using SendGrid's infrastructure",
+    "Using SendGrid dynamic templates with Handlebars for personalized email content",
+    "Processing inbound emails via SendGrid's Inbound Parse webhook",
+    "Full SendGrid API access beyond email: contact management, stats, suppressions, and domain authentication",
+    "Applications already on the Twilio/SendGrid platform needing a first-party supported Node.js SDK"
+  ],
+  "skip_when": [
+    "You need a vendor-agnostic email solution — this SDK only works with SendGrid's hosted service",
+    "You want to send email via raw SMTP — use Nodemailer instead",
+    "Your project sends fewer than 100 emails/day and you want a simpler API with generous free tiers (consider Resend or Postmark)",
+    "You need to render React-based email templates at build time — use react-email with any transport",
+    "You're building a Python or non-Node.js backend — this SDK is JavaScript/Node.js only"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "nodemailer",
+    "resend",
+    "postmark",
+    "mailgun",
+    "amazon-ses",
+    "sparkpost",
+    "custom-email",
+    "loops",
+    "mailtrap",
+    "plunk",
+    "react-email"
+  ],
+  "health": {
+    "stars": 3052,
+    "weekly_downloads": 3615172,
+    "last_commit": "2026-05-28T20:25:53Z",
+    "contributors": 185,
+    "license": "MIT",
+    "open_issues": 93
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

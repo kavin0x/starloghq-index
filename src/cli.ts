@@ -1,0 +1,110 @@
+import 'dotenv/config';
+import { Command } from 'commander';
+import { search } from './engine/search.js';
+import { loadCorpus } from './engine/corpus.js';
+import { createResilientSiftrankFn, createLlmFn } from './engine/siftrank.js';
+import { formatTable, formatJSON } from './engine/format.js';
+import { KnownCategorySchema, type Category } from './manifest/schema.js';
+import { runInit } from './init.js';
+import { runDoctor } from './doctor.js';
+
+const VALID_CATEGORIES = KnownCategorySchema.options;
+
+const program = new Command();
+
+program
+  .name('starlog')
+  .version('0.1.0')
+  .description('Capability indexing layer for AI coding agents');
+
+program
+  .command('search')
+  .description('Search capability manifests for library recommendations')
+  .argument('<query>', 'Natural language query (e.g., "auth for Next.js")')
+  .option('--format <type>', 'Output format: json or table', 'table')
+  .option('--category <cat>', 'Filter by category')
+  .option('--top-k <n>', 'Number of results', '5')
+  .option('--stack <stack>', 'Stack affinity filter (e.g., "next.js")')
+  .option('--context <desc>', 'Project context for vs_custom analysis')
+  .option('--diversity <lambda>', 'Diversity-relevance tradeoff (0=max diversity, 1=pure relevance, default: no MMR)', parseFloat)
+  .action(async (query: string, opts: Record<string, string>) => {
+    // Validate category -- warn for unknown categories but still search (D-04)
+    if (opts.category && !VALID_CATEGORIES.includes(opts.category as any)) {
+      console.warn(`Note: "${opts.category}" is not a known category (${VALID_CATEGORIES.join(', ')}). Searching corpus anyway.`);
+    }
+
+    // Validate format
+    if (opts.format !== 'json' && opts.format !== 'table') {
+      console.error(`Invalid format: ${opts.format}. Use "json" or "table".`);
+      process.exit(1);
+    }
+
+    // API delegation: when STARLOG_API_KEY is set, delegate to remote API
+    const apiKey = process.env.STARLOG_API_KEY;
+    if (apiKey) {
+      const params = new URLSearchParams({ q: query });
+      if (opts.category) params.set('category', opts.category);
+      const response = await fetch(`https://api.starlog.dev/search?${params}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
+      if (!response.ok) {
+        console.error(`API error: ${response.status} ${response.statusText}`);
+        process.exit(1);
+      }
+      const manifests = await response.json() as any[];
+      // Build QueryResult-shaped objects for the formatter
+      const results = manifests.map((m: any) => ({
+        manifest: m,
+        relevance_score: m._score ?? 0,
+        vs_custom: '',
+        context_fit: '',
+        tradeoffs: [],
+      }));
+      const output = opts.format === 'json' ? formatJSON(results) : formatTable(results);
+      console.log(output);
+      return;
+    }
+
+    // Free tier: local engine path
+    const corpus = await loadCorpus();
+    const deps = { siftrank: createResilientSiftrankFn(), llm: createLlmFn() };
+
+    const results = await search(query, corpus, {
+      category: opts.category as Category | undefined,
+      stack: opts.stack,
+      topK: parseInt(opts.topK as string, 10),
+      projectContext: opts.context,
+      diversityLambda: (opts as any).diversity !== undefined ? (opts as any).diversity : undefined,
+    }, deps);
+
+    if (results.length === 0) {
+      console.error('No matching manifests found.');
+      process.exit(0);
+    }
+
+    const output = opts.format === 'json'
+      ? formatJSON(results)
+      : formatTable(results);
+
+    console.log(output);
+  });
+
+program
+  .command('init')
+  .description('Configure AI coding agents to use Starlog (MCP server, hooks, instructions)')
+  .option('--project', 'Also add Starlog instructions to the current project CLAUDE.md')
+  .option('--all', 'Configure all supported agents, even ones not detected in this environment')
+  .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
+  .action(async (opts: { project?: boolean; all?: boolean; uninstall?: boolean }) => {
+    await runInit(opts);
+  });
+
+program
+  .command('doctor')
+  .description('Diagnose your Starlog setup (corpus, MCP server, hook, agent configs)')
+  .action(async () => {
+    const code = await runDoctor();
+    process.exit(code);
+  });
+
+program.parse();

@@ -1,0 +1,70 @@
+{
+  "id": "clerk",
+  "name": "Clerk",
+  "repo": "clerk/javascript",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides a fully managed authentication and user management platform with pre-built UI components for sign-up, sign-in, and profile management, eliminating the need to build auth infrastructure from scratch.",
+  "stack_affinity": [
+    "next.js",
+    "react",
+    "remix",
+    "astro",
+    "expo",
+    "vue",
+    "nuxt",
+    "express",
+    "fastify",
+    "hono",
+    "react-router",
+    "tanstack-start",
+    "chrome-extension",
+    "node"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Next.js or React apps that need polished, pre-built authentication UI components out of the box",
+    "SaaS applications requiring multi-tenancy with organizations, roles, and permissions",
+    "Projects that want managed auth with social login, MFA, and user profiles without running any auth infrastructure",
+    "Teams that need to ship authentication quickly and are comfortable with a hosted/paid service",
+    "B2B applications needing organization-level access control and member management"
+  ],
+  "skip_when": [
+    "You need a fully self-hosted or open-source authentication solution with no vendor dependency",
+    "Your project has a tight budget and cannot afford a paid authentication service beyond the free tier",
+    "You need authentication for a non-JavaScript backend (e.g., pure Python, Go, or Rust server)",
+    "You require complete control over the authentication database and token issuance logic",
+    "You are building a simple API-only service that only needs JWT verification without user-facing UI"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "nextauth",
+    "auth0",
+    "lucia",
+    "supabase-auth",
+    "firebase-auth",
+    "stytch",
+    "workos",
+    "kinde",
+    "hanko",
+    "aws-cognito",
+    "custom-authentication",
+    "iron-session",
+    "keycloak-js",
+    "passport"
+  ],
+  "health": {
+    "stars": 1706,
+    "weekly_downloads": 1370809,
+    "last_commit": "2026-05-28T23:17:36Z",
+    "contributors": 288,
+    "license": "MIT",
+    "open_issues": 139
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

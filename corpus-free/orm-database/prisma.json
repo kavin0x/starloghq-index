@@ -1,0 +1,67 @@
+{
+  "id": "prisma",
+  "name": "Prisma",
+  "repo": "prisma/prisma",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a type-safe, auto-generated query builder for Node.js and TypeScript applications with a declarative schema-first approach to data modeling, migrations, and multi-database support including PostgreSQL, MySQL, SQLite, SQL Server, MongoDB, and CockroachDB.",
+  "stack_affinity": [
+    "node",
+    "next.js",
+    "express",
+    "fastify",
+    "nest.js",
+    "graphql",
+    "serverless",
+    "cloudflare-workers",
+    "typescript"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "TypeScript-first projects that need end-to-end type safety from database schema to query results",
+    "Teams that prefer declarative, schema-first data modeling with auto-generated migrations",
+    "Full-stack Next.js or serverless applications needing a robust ORM with broad database support",
+    "Greenfield projects where schema design drives development and Prisma Studio aids data exploration",
+    "Applications requiring seamless switching or support across multiple relational databases and MongoDB"
+  ],
+  "skip_when": [
+    "You need fine-grained control over raw SQL queries and want a lightweight query builder like Knex or Kysely",
+    "Your project requires complex SQL features like CTEs, window functions, or advanced joins not well-supported by Prisma's abstraction",
+    "You are building a Python, Go, or non-Node.js backend",
+    "You need an extremely minimal dependency footprint since Prisma bundles a Rust-based query engine binary",
+    "You are working with an existing legacy database schema that heavily uses stored procedures or database-specific features that don't map well to Prisma's model abstraction"
+  ],
+  "hosted_alternative": {
+    "name": "Prisma Postgres",
+    "manifest_id": "prisma-postgres",
+    "pricing_summary": "Managed PostgreSQL by Prisma with a free tier; paid plans scale based on usage and storage"
+  },
+  "alternative_ids": [
+    "drizzle",
+    "typeorm",
+    "sequelize",
+    "knex",
+    "mikro-orm",
+    "kysely",
+    "mongoose",
+    "better-sqlite3",
+    "custom-orm",
+    "objection",
+    "postgres-js",
+    "slonik"
+  ],
+  "health": {
+    "stars": 46027,
+    "weekly_downloads": 11620033,
+    "last_commit": "2026-05-19T15:55:38Z",
+    "contributors": 341,
+    "license": "Apache-2.0",
+    "open_issues": 2621
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

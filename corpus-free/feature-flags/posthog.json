@@ -1,0 +1,61 @@
+{
+  "id": "posthog",
+  "name": "PostHog JS",
+  "repo": "PostHog/posthog-js",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides feature flags, analytics, session replay, A/B testing, and product analytics as part of the PostHog platform, enabling teams to ship features behind flags while simultaneously capturing usage data and user behavior from JavaScript/TypeScript applications.",
+  "stack_affinity": [
+    "react",
+    "next.js",
+    "react-native",
+    "nuxt",
+    "node",
+    "vue",
+    "webpack",
+    "rollup"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Teams wanting feature flags tightly integrated with product analytics and session replay in a single platform",
+    "Next.js or React apps needing autocapture analytics alongside feature flag evaluation",
+    "Organizations that want a self-hosted or cloud-hosted all-in-one product analytics and experimentation platform",
+    "Projects needing A/B testing with built-in statistical analysis tied to captured events",
+    "React Native mobile apps needing feature flags and analytics from a single SDK"
+  ],
+  "skip_when": [
+    "You need a lightweight, standalone feature flag solution without bundled analytics overhead",
+    "Your project requires a vendor-neutral feature flag setup using the OpenFeature standard",
+    "You are building a backend-only service that never needs browser analytics or session replay",
+    "You need a fully open-source self-hosted feature flag solution without any cloud dependency and PostHog's infrastructure requirements are too heavy",
+    "Your organization already has separate, established analytics and feature flag tools and does not want to consolidate"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "launchdarkly",
+    "statsig",
+    "growthbook",
+    "flagsmith",
+    "unleash",
+    "split",
+    "openfeature",
+    "configcat",
+    "custom-feature-flags",
+    "devcycle",
+    "flipt"
+  ],
+  "health": {
+    "stars": 545,
+    "weekly_downloads": 6550006,
+    "last_commit": "2026-05-28T23:53:52Z",
+    "contributors": 140,
+    "license": "NOASSERTION",
+    "open_issues": 200
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

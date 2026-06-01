@@ -1,0 +1,58 @@
+{
+  "id": "keyv",
+  "name": "Keyv",
+  "repo": "jaredwray/keyv",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides a unified key-value storage API with TTL-based expiry across multiple backends (in-memory, Redis, PostgreSQL, MySQL, MongoDB, SQLite, Memcache), allowing developers to swap storage engines without changing application code.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "fastify",
+    "next.js",
+    "koa",
+    "hapi",
+    "bun"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Applications that need a simple get/set/delete caching API with TTL support without committing to a specific backend",
+    "Projects that want to start with in-memory caching and migrate to Redis or PostgreSQL later without code changes",
+    "Multi-backend caching where different environments use different stores (e.g., SQLite in dev, Redis in production)",
+    "HTTP response caching middleware that needs a pluggable cache store (e.g., cacheable-request uses Keyv)",
+    "Lightweight key-value persistence in CLI tools or small services where a full ORM is overkill"
+  ],
+  "skip_when": [
+    "You need advanced Redis features like pub/sub, streams, Lua scripting, or cluster-aware operations",
+    "You need a full-featured caching framework with multi-tier caching, cache stampede protection, or tag-based invalidation",
+    "Your application requires high-throughput caching with minimal overhead — the abstraction layer adds latency compared to using a Redis client directly",
+    "You only ever need in-memory caching with LRU eviction — a dedicated LRU cache library is lighter and faster"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "ioredis",
+    "node-redis",
+    "lru-cache",
+    "node-cache",
+    "cacheable",
+    "unstorage",
+    "catbox",
+    "custom-caching",
+    "memcached",
+    "upstash-redis"
+  ],
+  "health": {
+    "stars": 3137,
+    "weekly_downloads": 124923087,
+    "last_commit": "2026-05-08T18:21:21Z",
+    "contributors": 79,
+    "license": "MIT",
+    "open_issues": 1
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": false,
+    "maintenance_status": "active"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "id": "upstash-redis",
+  "name": "Upstash Redis",
+  "repo": "upstash/upstash-redis",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides an HTTP/REST-based Redis client that works in serverless and edge environments where persistent TCP connections are unavailable, enabling caching, session storage, and data operations via Upstash's managed Redis service.",
+  "stack_affinity": [
+    "next.js",
+    "cloudflare-workers",
+    "vercel",
+    "aws-lambda",
+    "fastly",
+    "deno",
+    "node",
+    "bun"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Caching and key-value storage in serverless functions (AWS Lambda, Vercel Serverless Functions) where TCP-based Redis clients cannot maintain connections",
+    "Edge runtime caching with Cloudflare Workers or Vercel Edge Functions that forbid raw TCP sockets",
+    "Next.js applications needing distributed caching or rate limiting without managing Redis infrastructure",
+    "Lightweight session or state storage in Jamstack or statically-deployed apps that communicate over HTTP",
+    "Multi-region, low-latency caching via Upstash's globally replicated Redis without connection pooling overhead"
+  ],
+  "skip_when": [
+    "You need a self-hosted or on-premise Redis setup — this client only works with the Upstash managed REST API",
+    "Your workload requires high-throughput pipelining over persistent TCP connections where latency per command matters (use ioredis or node-redis instead)",
+    "You need advanced Redis features like Lua scripting debugging, Redis Modules, or cluster-mode topology control not exposed through the REST API",
+    "You want a provider-agnostic caching abstraction that can swap between Redis, Memcached, or in-memory backends (use keyv or unstorage instead)",
+    "Your application runs in a long-lived server process with stable networking where HTTP overhead per Redis call is unnecessary"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "ioredis",
+    "node-redis",
+    "keyv",
+    "unstorage",
+    "custom-caching",
+    "lru-cache"
+  ],
+  "health": {
+    "stars": 948,
+    "weekly_downloads": 3688613,
+    "last_commit": "2026-05-22T09:38:05Z",
+    "contributors": 31,
+    "license": "MIT",
+    "open_issues": 14
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

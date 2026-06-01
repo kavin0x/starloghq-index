@@ -1,0 +1,56 @@
+{
+  "id": "ws",
+  "name": "ws",
+  "repo": "websockets/ws",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides a fast, lightweight, and RFC-6455 compliant WebSocket client and server implementation for Node.js, handling low-level WebSocket protocol concerns like framing, masking, ping/pong, close handshakes, and permessage-deflate compression.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "http",
+    "https",
+    "fastify"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Building custom WebSocket servers on Node.js where you need full control over the protocol and connection lifecycle",
+    "Adding WebSocket support to an existing Node.js HTTP/HTTPS server (Express, Fastify, etc.) via the upgrade mechanism",
+    "High-performance binary data streaming between Node.js services or between server and native clients",
+    "Implementing custom real-time protocols where higher-level abstractions like Socket.IO add unnecessary overhead",
+    "Microservice-to-microservice low-latency communication over persistent connections"
+  ],
+  "skip_when": [
+    "You need automatic reconnection, multiplexing, rooms, namespaces, or broadcasting abstractions out of the box — use Socket.IO or a higher-level library",
+    "Your client is a browser and you need fallback transports (long-polling) for environments without WebSocket support",
+    "You need a fully managed real-time service with presence, pub/sub channels, and authentication built in — use Pusher, Ably, or Supabase Realtime",
+    "You want a collaborative editing or CRDT framework — use Yjs or Liveblocks instead",
+    "You need isomorphic client code that runs in both Node.js and the browser without a wrapper — ws does not work in browsers"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "socket-io",
+    "pusher",
+    "ably",
+    "supabase-realtime",
+    "sockjs",
+    "custom-realtime",
+    "centrifugo",
+    "mqtt",
+    "yjs"
+  ],
+  "health": {
+    "stars": 22769,
+    "weekly_downloads": 214134829,
+    "last_commit": "2026-05-22T19:32:35Z",
+    "contributors": 181,
+    "license": "MIT",
+    "open_issues": 5
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": false,
+    "maintenance_status": "active"
+  }
+}

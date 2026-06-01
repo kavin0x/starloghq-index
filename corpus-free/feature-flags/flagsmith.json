@@ -1,0 +1,62 @@
+{
+  "id": "flagsmith",
+  "name": "Flagsmith JavaScript Client",
+  "repo": "Flagsmith/flagsmith-js-client",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides feature flag evaluation and remote config management for JavaScript applications via the Flagsmith platform, supporting both hosted and self-hosted backends with identity-based targeting, traits, real-time updates via SSE, caching, and integrations with Datadog, Dynatrace, and Sentry.",
+  "stack_affinity": [
+    "react",
+    "react-native",
+    "next.js",
+    "angular",
+    "node"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "React and React Native apps needing feature flags with a provider/hooks pattern and typed flag keys",
+    "Next.js projects requiring SSR-compatible feature flags with server state hydration and caching",
+    "Teams wanting a self-hostable feature flag backend with a managed SaaS fallback option",
+    "Applications needing identity-based flag targeting with user traits and transient identities",
+    "Projects requiring real-time flag updates via server-sent events without polling"
+  ],
+  "skip_when": [
+    "You need a vendor-neutral SDK and prefer the OpenFeature standard across multiple providers",
+    "Your project is Python-only or backend-only with no JavaScript runtime",
+    "You want purely local/in-code feature flag evaluation without any external API dependency",
+    "You need a lightweight boolean-only toggle and don't want a full platform SDK with analytics, Datadog, and Dynatrace integrations",
+    "You are already deeply integrated with LaunchDarkly or another provider and switching cost is unjustified"
+  ],
+  "hosted_alternative": {
+    "name": "Flagsmith Cloud",
+    "manifest_id": "flagsmith",
+    "pricing_summary": "Free tier up to 50k requests/month; paid plans start at $45/month for additional seats, environments, and API calls"
+  },
+  "alternative_ids": [
+    "launchdarkly",
+    "statsig",
+    "unleash",
+    "growthbook",
+    "split",
+    "posthog",
+    "flipt",
+    "openfeature",
+    "devcycle",
+    "configcat",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 67,
+    "weekly_downloads": 140361,
+    "last_commit": "2026-05-28T03:11:29Z",
+    "contributors": 41,
+    "license": "BSD-3-Clause",
+    "open_issues": 19
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

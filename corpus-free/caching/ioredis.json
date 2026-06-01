@@ -1,0 +1,61 @@
+{
+  "id": "ioredis",
+  "name": "ioredis",
+  "repo": "redis/ioredis",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides a full-featured, high-performance Redis client for Node.js with native support for Redis Cluster, Sentinel, Streams, Pub/Sub, pipelining, autopipelining, Lua scripting, and TLS — enabling applications to use Redis for caching, real-time messaging, and distributed data management.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "fastify",
+    "koa",
+    "nest.js",
+    "next.js",
+    "bull",
+    "bullmq"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Node.js applications requiring Redis Cluster or Sentinel support for high availability",
+    "Queue systems like BullMQ that depend on ioredis as their Redis driver",
+    "Applications needing autopipelining to maximize throughput with many concurrent Redis commands",
+    "Projects using Redis Streams, Pub/Sub, or Lua scripting that benefit from a rich, typed API",
+    "Existing codebases already built on ioredis that need continued maintenance and feature stability"
+  ],
+  "skip_when": [
+    "You need client-side support for Redis Stack modules like RedisJSON, RediSearch, or RedisTimeSeries out of the box (node-redis has built-in module support)",
+    "You want a serverless-friendly Redis client over HTTP without persistent TCP connections (use Upstash Redis instead)",
+    "Your project only needs a simple in-memory cache without an external Redis server (use lru-cache or node-cache)",
+    "You are building a Python application or non-Node.js backend",
+    "You need a storage-agnostic caching abstraction that can switch between Redis, Memcached, and other backends (use keyv or unstorage)"
+  ],
+  "hosted_alternative": {
+    "name": "Upstash Redis",
+    "manifest_id": "upstash-redis",
+    "pricing_summary": "Free tier with 10K commands/day; pay-as-you-go from $0.2 per 100K commands; Pro plans available"
+  },
+  "alternative_ids": [
+    "node-redis",
+    "upstash-redis",
+    "keyv",
+    "unstorage",
+    "custom-caching",
+    "memcached",
+    "node-cache"
+  ],
+  "health": {
+    "stars": 15284,
+    "weekly_downloads": 18361400,
+    "last_commit": "2026-05-27T15:42:27Z",
+    "contributors": 169,
+    "license": "MIT",
+    "open_issues": 265
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "id": "auth0",
+  "name": "Auth0 Next.js SDK",
+  "repo": "auth0/nextjs-auth0",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Implements user authentication in Next.js applications using Auth0 as the identity provider, handling login, logout, session management, token refresh, and middleware-based route protection with encrypted cookie-based sessions.",
+  "stack_affinity": [
+    "next.js",
+    "react",
+    "vercel",
+    "node"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Next.js apps (App Router and Pages Router) that need production-grade authentication backed by Auth0's managed identity platform",
+    "Applications requiring social login, enterprise SSO, or MFA without building identity infrastructure from scratch",
+    "Teams already using Auth0 as their identity provider who want a first-party Next.js integration",
+    "Preview/dynamic deployment environments (Vercel, Netlify) that need automatic base URL inference for auth callbacks",
+    "Next.js 15 and 16 projects that need middleware or proxy-based session rolling and route protection"
+  ],
+  "skip_when": [
+    "You are not using Next.js — this SDK is exclusively designed for the Next.js framework",
+    "You want a self-hosted or vendor-neutral auth solution without dependency on Auth0's managed service",
+    "Your project is a pure SPA or static site with no server-side rendering or API routes",
+    "You need authentication for a non-React framework like Express, Fastify, or Django",
+    "Budget constraints prevent using Auth0's paid tiers and you need a fully free/open-source identity provider"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "clerk",
+    "nextauth",
+    "lucia",
+    "supabase-auth",
+    "firebase-auth",
+    "aws-cognito",
+    "stytch",
+    "workos",
+    "kinde",
+    "keycloak-js",
+    "custom-authentication",
+    "hanko",
+    "iron-session",
+    "passport"
+  ],
+  "health": {
+    "stars": 2299,
+    "weekly_downloads": 518429,
+    "last_commit": "2026-05-28T19:03:22Z",
+    "contributors": 93,
+    "license": "MIT",
+    "open_issues": 26
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}
