@@ -55,4 +55,10 @@ jobs:
           [ "$TAG" = "$PKG_VERSION" ] || { echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}"; exit 1; }
 
       - name: Publish to npm (OIDC, with provenance)
+        # Blank the dummy token that actions/setup-node writes into .npmrc
+        # (//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}); a non-empty
+        # invalid token makes npm attempt token auth and skip OIDC. Empty →
+        # npm uses OIDC trusted publishing.
         run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ""
