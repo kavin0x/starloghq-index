@@ -2,6 +2,28 @@
 
 **Better library decisions for your AI coding agent — free, local, no account.**
 
+<p align="center">
+  <img src="demo/starlog-demo.gif" alt="Starlog returning ranked library recommendations in the terminal, then wiring itself into Claude Code, Cursor, Copilot and Codex with one command" width="820">
+</p>
+
+**Try it in one command — nothing to install, no API key, no account:**
+
+```bash
+npx starloghq search "auth for a Next.js app"
+```
+
+Then wire it into your coding agent (Claude Code, Cursor, Copilot, Codex):
+
+```bash
+npx starloghq init
+```
+
+> **Source-available** under BUSL-1.1 — free to use, modify, and self-host; **converts to Apache-2.0 in 2030**. [Details ↓](#license)
+
+---
+
+## Why
+
 AI coding agents (Claude Code, Cursor, Copilot) pick libraries from their training data — which ranks options by how often they appeared in scraped code, not by what actually fits your task. Popularity, not merit. The results are weak: research finds agents draw from only 32–39 unique libraries across projects and are highly inconsistent (83%) in what they recommend, and they default to hand-rolling custom code instead of reaching for a battle-tested library across most capability categories.
 
 AI-suggested dependencies are also often unsafe: research finds ~49% carry known vulnerabilities and ~34% are hallucinated outright — the package simply doesn't exist. Picking a real, well-maintained library, and knowing when to skip one, is most of the battle.
@@ -19,7 +41,7 @@ Starlog is a local **capability index** for AI coding agents: a structured, quer
 ## What you get
 
 - **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets ranked, structured answers instead of training-data recall.
-- **Package-install hook** — fires on `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces a library's `skip_when` conditions and alternatives *before* your agent commits to it.
+- **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces that library's `skip_when` conditions and alternatives as context, so the agent can reconsider or swap before building on it. It's advisory — it informs the agent's next move, it doesn't block the install.
 - **`starlog search` CLI** — query the same index directly from your terminal.
 - **Runs on your machine** — the engine and corpus are local; searches need no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)
 
@@ -83,19 +105,17 @@ Replace `/path/to/starloghq` with the install location (`$(npm root -g)/starlogh
 ## CLI usage
 
 ```bash
-starlog search "auth for Next.js SaaS"
+starlog search "auth for a Next.js app"
 ```
 
 ```
 #   Library             Category          Score   Solves
 --------------------------------------------------------------------------------
-1   Clerk               authentication    75.00   Provides a fully managed authentication and user manag...
-    vs custom: Clerk eliminates 2-4 weeks of auth infrastructure work with pre-built UI
-2   Auth0               authentication    62.50   Provides a full-stack, framework-agnostic authenticati...
-    vs custom: Battle-tested OAuth flows across 80+ providers vs hand-rolling each one
-3   Supabase Auth       authentication    50.00   Provides authentication as part of the Supabase platfo...
-    vs custom: Auth + database + realtime in one SDK vs stitching 3 services together
+1   Auth0 Next.js SDK   authentication    100.00  Implements user authentication in Next.js applications using Auth0 ...
+2   Clerk               authentication    61.82   Provides a fully managed authentication and user management platfor...
 ```
+
+Out of the box this uses the **local keyword ranker** — no API key, no network — which scores each library by how well its capability data matches your query. Enable **semantic ranking** (install the `siftrank` binary + set `OPENROUTER_API_KEY`, or set a hosted `STARLOG_API_KEY`) and results reorder by deeper relevance; add `--context "<your project>"` to also generate a per-library `vs custom` rationale (why reach for this instead of hand-rolling it).
 
 Options:
 
@@ -145,7 +165,7 @@ Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-s
 
 | Category | Baseline | With Starlog | Reduction |
 |---|---|---|---|
-| Authentication | 39.6% | 20.8% | **-18.7pp** |
+| Authentication | 39.6% | 20.8% | **-18.8pp** |
 | Feature Flags | 37.5% | 4.2% | **-33.3pp** |
 | Caching | 14.6% | 0% | **-14.6pp** |
 | Background Jobs | 12.5% | 0% | **-12.5pp** |
