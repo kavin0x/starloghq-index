@@ -103,6 +103,18 @@ function fieldMatch(tokens: string[], term: string): number {
   return best;
 }
 
+// Saturating score curve: score = 100 * raw / (raw + SCORE_HALF). This is an
+// ABSOLUTE map (no per-query max-normalization), so scores are comparable
+// across queries and a lone weak match can never be presented as 100. A raw of
+// SCORE_HALF scores 50; strong multi-field matches (raw ~20-27) saturate in the
+// mid-to-high 70s; an incidental single-term match (raw ~4-9) stays in the 30s
+// to high 50s -- honest "weak" territory rather than a confident-looking 100.
+const SCORE_HALF = 7;
+
+// Drop the long tail below this absolute score (~raw 3.8): results that barely
+// brushed a single common token.
+const RELEVANCE_FLOOR = 35;
+
 // A hit in the library's name or category says far more about fitness than an
 // incidental hit in its stack list, so fields are weighted, not pooled.
 const FIELD_WEIGHTS: Array<['name' | 'category' | 'solves' | 'best_for' | 'stack', number]> = [
@@ -178,23 +190,17 @@ export const keywordSiftrank: SiftrankFn = async (manifests, query) => {
     return { manifest: m, raw, onTopic };
   });
 
-  const max = Math.max(0, ...scored.map((s) => s.raw));
   let ranked = scored
     .map((s) => ({
       key: s.manifest.id,
       value: s.manifest.name,
       object: {} as Record<string, unknown>,
-      score: max > 0 ? Math.round((s.raw / max) * 10000) / 100 : 0,
+      score: s.raw > 0 ? Math.round((100 * s.raw) / (s.raw + SCORE_HALF) * 100) / 100 : 0,
       exposure: 1,
       rank: 0,
       onTopic: s.onTopic,
     }))
-    // Relevance floor: drop weak matches below ~35% of the top score.
-    // Normalization pins the best match at 100, so this is "barely a third as
-    // relevant as the best hit" -- the noisy tail where a result matched only a
-    // single common term (e.g. an off-category lib that happens to mention
-    // "next.js") while the best hit matched the distinctive head term too.
-    .filter((r) => r.score >= 35);
+    .filter((r) => r.score >= RELEVANCE_FLOOR);
 
   // Prefer capability ("on-topic") matches; fall back to stack-only matches
   // only when nothing matched a capability field, so a pure stack query
@@ -238,9 +244,16 @@ export function createResilientSiftrankFn(): SiftrankFn {
             'For semantic (LLM) ranking, install siftrank and set OPENROUTER_API_KEY.',
           );
         } else {
-          const msg = raw.split('\n')[0].slice(0, 200);
+          // The binary is present but errored. Don't leak the full command and
+          // temp-file path (ugly and noisy) -- surface just the exit code and,
+          // when the likely cause is a missing key, a targeted hint.
+          const e = err as { code?: number | string };
+          const exit = typeof e.code === 'number' ? ` (exit ${e.code})` : '';
+          const hint = process.env.OPENROUTER_API_KEY
+            ? ''
+            : ' Set OPENROUTER_API_KEY to enable semantic ranking.';
           console.error(
-            `[starlog] siftrank ranking failed (${msg}); using local keyword ranking instead.`,
+            `[starlog] siftrank failed${exit}; using local keyword ranking instead.${hint}`,
           );
         }
       }

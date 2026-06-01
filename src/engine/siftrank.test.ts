@@ -54,6 +54,16 @@ const CORPUS: CapabilityManifest[] = [
     solves: 'Transactional email API for developers',
     stack_affinity: ['node'],
   }),
+  // Filler: none of these match the test queries (auth / background job queue /
+  // next.js / ui). They just give the corpus realistic size so query terms are
+  // distinctive enough (idf) that genuine hits clear the production relevance
+  // floor -- a 4-manifest corpus deflates idf and would drop real matches.
+  manifest({ id: 'f-mail', name: 'Mailgun', category: 'email', solves: 'send email over SMTP', stack_affinity: ['node'] }),
+  manifest({ id: 'f-flags', name: 'Flagsmith', category: 'feature-flags', solves: 'remote config and feature toggles', stack_affinity: ['node'] }),
+  manifest({ id: 'f-rt', name: 'Pusher', category: 'realtime', solves: 'hosted pub/sub channels', stack_affinity: ['node'] }),
+  manifest({ id: 'f-cache', name: 'Upstash', category: 'caching', solves: 'serverless key-value store', stack_affinity: ['node'] }),
+  manifest({ id: 'f-orm', name: 'Kysely', category: 'orm-database', solves: 'typed SQL query builder', stack_affinity: ['node'] }),
+  manifest({ id: 'f-rt2', name: 'Ably', category: 'realtime', solves: 'realtime messaging platform', stack_affinity: ['node'] }),
 ];
 
 describe('keywordSiftrank', () => {
@@ -70,10 +80,19 @@ describe('keywordSiftrank', () => {
 
   it('produces differentiated scores, not flat ties', async () => {
     const results = await keywordSiftrank(CORPUS, 'auth for a Next.js app');
-    expect(results[0].score).toBe(100);
-    // The runner-up is meaningfully below the top -- the old ranker tied at 100.
-    expect(results[1].score).toBeLessThan(100);
+    // Absolute saturating score: strong matches sit high but never a fake 100,
+    // and the runner-up is meaningfully below the top (the old ranker tied at 100).
+    expect(results[0].score).toBeGreaterThan(results[1].score);
+    expect(results[0].score).toBeLessThan(100);
     expect(results[0].score).not.toBe(results[1].score);
+  });
+
+  it('never reports a perfect 100 (no max-normalized lone match)', async () => {
+    // A single weak hit must not be presented as 100% confidence.
+    for (const q of ['auth for a Next.js app', 'background job queue', 'ui widget']) {
+      const results = await keywordSiftrank(CORPUS, q);
+      for (const r of results) expect(r.score).toBeLessThan(100);
+    }
   });
 
   it('ignores stopwords -- "auth" and "auth for a good app" rank the same top', async () => {
@@ -116,11 +135,19 @@ describe('keywordSiftrank', () => {
 
   it('breaks ties toward the healthier (more-downloaded) library', async () => {
     // Two libraries identical except download counts -> the popular one leads.
+    // Filler manifests (no "cache") give the corpus enough size that "cache" is
+    // a distinctive term and the twins clear the relevance floor.
+    const filler: CapabilityManifest[] = [
+      manifest({ id: 'f1', name: 'Mailer', category: 'email', solves: 'send email' }),
+      manifest({ id: 'f2', name: 'Flagger', category: 'feature-flags', solves: 'feature flags' }),
+      manifest({ id: 'f3', name: 'Queuer', category: 'background-jobs', solves: 'job queue' }),
+      manifest({ id: 'f4', name: 'Socketeer', category: 'realtime', solves: 'websockets' }),
+    ];
     const twins: CapabilityManifest[] = [
       manifest({ id: 'low', name: 'Acme Cache', category: 'caching', solves: 'in-memory cache', health: { stars: 1, weekly_downloads: 1000, last_commit: '2025-01-01', contributors: 1, license: 'MIT', open_issues: 0 } }),
       manifest({ id: 'high', name: 'Acme Cache', category: 'caching', solves: 'in-memory cache', health: { stars: 1, weekly_downloads: 5_000_000, last_commit: '2025-01-01', contributors: 1, license: 'MIT', open_issues: 0 } }),
     ];
-    const results = await keywordSiftrank(twins, 'cache');
+    const results = await keywordSiftrank([...filler, ...twins], 'cache');
     expect(results[0].key).toBe('high');
   });
 });

@@ -11,11 +11,24 @@ import { getPackageVersion } from './paths.js';
 // ── Result formatting ───────────────────────────────────────────────────────
 
 function formatResults(query: string, results: QueryResult[]): string {
+  const categories = KnownCategorySchema.options.join(', ');
+
   if (results.length === 0) {
-    return `No manifests found for: "${query}"`;
+    return `No strong match for "${query}" in the local index, which covers: ${categories}. ` +
+      `This capability may be outside the indexed corpus -- do not present a forced match as a recommendation.`;
   }
 
   const lines: string[] = [];
+
+  // A single isolated, modestly-scored hit usually means a stray keyword match
+  // rather than a real capability fit; tell the agent so it doesn't relay a
+  // lone off-topic result as a confident recommendation.
+  if (results.length === 1 && results[0].relevance_score < 70) {
+    lines.push(
+      `_No strong match in the local index (covers: ${categories}). Closest by keyword -- treat as low confidence:_`,
+      '',
+    );
+  }
   for (const r of results) {
     const m = r.manifest;
     lines.push(`## ${m.name} (${m.id})`);

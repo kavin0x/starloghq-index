@@ -98,8 +98,22 @@ program
     );
 
     if (results.length === 0) {
-      console.error('No matching manifests found.');
+      console.error(
+        `No strong match in the local index. It covers: ${VALID_CATEGORIES.join(', ')}.\n` +
+        `Try a query in one of those areas, or enable semantic ranking (set OPENROUTER_API_KEY) for broader matching.`,
+      );
       process.exit(0);
+    }
+
+    // A single isolated, modestly-scored hit means the query likely matched a
+    // stray keyword rather than a real capability (the in-domain case returns a
+    // cluster of same-category libraries). Flag it so a lone off-topic result
+    // doesn't read as a confident recommendation. JSON output stays clean.
+    if (opts.format !== 'json' && results.length === 1 && results[0].relevance_score < 70) {
+      console.error(
+        `No strong match in the local index (covers: ${VALID_CATEGORIES.join(', ')}). ` +
+        `Closest by keyword:`,
+      );
     }
 
     const output = opts.format === 'json'
