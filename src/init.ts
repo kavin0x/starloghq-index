@@ -95,7 +95,7 @@ function writeFileAtomic(p, data) {
 let CORPUS_DIR;
 try {
   CORPUS_DIR = require('path').join(
-    require('path').dirname(require.resolve('@starlog/index/package.json')),
+    require('path').dirname(require.resolve('starloghq/package.json')),
     'corpus-free'
   );
 } catch {

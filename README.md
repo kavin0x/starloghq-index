@@ -17,14 +17,7 @@ Starlog fixes this with structured capability manifests generated from code anal
 ## Quick start
 
 ```bash
-git clone https://github.com/starloghq/index.git starlog-index
-cd starlog-index && npm install
-```
-
-### One-command setup (recommended)
-
-```bash
-npx tsx src/cli.ts init
+npx starloghq init
 ```
 
 This wires everything into Claude Code automatically:
@@ -33,41 +26,56 @@ This wires everything into Claude Code automatically:
 - **PostToolUse hook** installed -- fires on `npm install`/`pnpm add`/`yarn add`/`pip install` and surfaces skip_when conditions and alternatives from the manifest corpus
 - All operations are **idempotent** -- safe to re-run
 
+For repeated use, install globally so the `starlog` command is always on your PATH:
+
+```bash
+npm install -g starloghq
+starlog init
+```
+
 Add `--project` to also inject CLAUDE.md instructions into your current project, telling Claude to always consult Starlog before recommending libraries:
 
 ```bash
-npx tsx src/cli.ts init --project
+starlog init --project
 ```
 
 To remove the integration cleanly:
 
 ```bash
-npx tsx src/cli.ts init --uninstall
+starlog init --uninstall
+```
+
+### From source
+
+```bash
+git clone https://github.com/starloghq/index.git starlog-index
+cd starlog-index && npm install
+npx tsx src/cli.ts init
 ```
 
 ### Manual setup
 
-If you prefer to configure manually, add to `~/.claude/settings.json`:
+`starlog init` writes this for you with an absolute path resolved automatically. If you prefer to configure manually, add to `~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "starlog": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/starlog/src/mcp.ts"]
+      "command": "node",
+      "args": ["/path/to/starloghq/dist/mcp.js"]
     }
   }
 }
 ```
 
-Replace `/path/to/starlog` with the actual clone location. The MCP server exposes a single tool -- `starlog_search` -- that accepts natural language queries with optional category, stack, and top_k filters.
+Replace `/path/to/starloghq` with the install location (`$(npm root -g)/starloghq` for a global install, or your clone directory when running from source). The MCP server exposes a single tool -- `starlog_search` -- that accepts natural language queries with optional category, stack, and top_k filters.
 
 ## CLI usage
 
-For direct queries outside an agent context:
+For direct queries outside an agent context (after `npm install -g starloghq`):
 
 ```bash
-npx tsx src/cli.ts search "auth for Next.js SaaS"
+starlog search "auth for Next.js SaaS"
 ```
 
 ```
