@@ -36,7 +36,7 @@ export function createSiftrankFn(): SiftrankFn {
         '--file', tmpFile,
         '--json',
         '--prompt', query,
-        '--model', 'anthropic/claude-haiku-4.5',
+        '--model', process.env.STARLOG_RANK_MODEL || 'anthropic/claude-haiku-4.5',
         '--base-url', 'https://openrouter.ai/api/v1',
         '--batch-size', '10',
         '--template', '{{ .name }}: {{ .solves }} | Best for: {{ range .best_for }}{{ . }}, {{ end }}',
@@ -239,21 +239,22 @@ export function createResilientSiftrankFn(): SiftrankFn {
         // failure. A binary that is present but errored is unexpected, so keep
         // the first line of its cause to aid debugging.
         if (/ENOENT/.test(raw)) {
+          // No siftrank binary -- the ordinary default. Frame keyword ranking
+          // as a first-class mode and point to `doctor` for the (optional)
+          // upgrade rather than dumping setup steps on every search.
           console.error(
-            '[starlog] Using local keyword ranking. ' +
-            'For semantic (LLM) ranking, install siftrank and set OPENROUTER_API_KEY.',
+            '[starlog] Using keyword ranking (offline default). ' +
+            'For sharper semantic ranking, run: starlog doctor',
           );
         } else {
           // The binary is present but errored. Don't leak the full command and
-          // temp-file path (ugly and noisy) -- surface just the exit code and,
-          // when the likely cause is a missing key, a targeted hint.
+          // temp-file path (ugly and noisy) -- surface just the exit code and
+          // route to `doctor`, which explains exactly what to configure.
           const e = err as { code?: number | string };
           const exit = typeof e.code === 'number' ? ` (exit ${e.code})` : '';
-          const hint = process.env.OPENROUTER_API_KEY
-            ? ''
-            : ' Set OPENROUTER_API_KEY to enable semantic ranking.';
           console.error(
-            `[starlog] siftrank failed${exit}; using local keyword ranking instead.${hint}`,
+            `[starlog] siftrank failed${exit}; using keyword ranking instead. ` +
+            'Run `starlog doctor` to check your ranking setup.',
           );
         }
       }
@@ -287,7 +288,7 @@ export function createLlmFn(): LlmFn {
   return async (prompt: string, system?: string): Promise<string> => {
     const client = await getClient();
     const response = await client.messages.create({
-      model: 'anthropic/claude-haiku-4.5',
+      model: process.env.STARLOG_RANK_MODEL || 'anthropic/claude-haiku-4.5',
       max_tokens: 1024,
       ...(system ? { system } : {}),
       messages: [{ role: 'user', content: prompt }],

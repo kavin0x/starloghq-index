@@ -244,25 +244,45 @@ async function checkProjectAgents(projectDir: string): Promise<Check[]> {
 
 // ── LLM ranking availability (informational) ────────────────────────────────
 
-async function checkRanker(): Promise<Check> {
+type RankingTier = 'hosted' | 'local-llm' | 'keyword';
+
+// Which ranking mode is actually active, and why. Mirrors the precedence in
+// search-service.ts: hosted API key wins, then a local siftrank binary +
+// OpenRouter key, else the offline keyword ranker.
+function rankingState(): { tier: RankingTier; detail: string } {
   const gopath = process.env.GOPATH || join(homedir(), 'go');
-  const binary = join(gopath, 'bin', 'siftrank');
-  const hasBinary = existsSync(binary);
-  const hasKey = Boolean(process.env.OPENROUTER_API_KEY) || Boolean(process.env.STARLOG_API_KEY);
+  const hasBinary = existsSync(join(gopath, 'bin', 'siftrank'));
 
-  if (hasKey && (hasBinary || process.env.STARLOG_API_KEY)) {
-    const via = process.env.STARLOG_API_KEY ? 'hosted API' : 'siftrank + OPENROUTER_API_KEY';
-    return { level: 'ok', label: 'Ranking', detail: `LLM ranking available (${via})` };
+  if (process.env.STARLOG_API_KEY) {
+    return { tier: 'hosted', detail: 'semantic ranking via hosted API (STARLOG_API_KEY)' };
   }
+  if (hasBinary && process.env.OPENROUTER_API_KEY) {
+    return { tier: 'local-llm', detail: 'semantic ranking via local siftrank + OPENROUTER_API_KEY' };
+  }
+  return { tier: 'keyword', detail: 'keyword ranking — offline, no key, no network (the default)' };
+}
 
-  const missing: string[] = [];
-  if (!hasBinary) missing.push('siftrank binary');
-  if (!process.env.OPENROUTER_API_KEY) missing.push('OPENROUTER_API_KEY');
-  return {
-    level: 'warn',
-    label: 'Ranking',
-    detail: `keyword fallback (LLM ranking needs ${missing.join(' + ')}, or set STARLOG_API_KEY)`,
-  };
+// Keyword ranking is a legitimate default, not a problem -- report it as OK and
+// surface the optional upgrade separately (see printRankingHelp), so a working
+// setup doesn't read as a warning.
+async function checkRanker(): Promise<Check> {
+  return { level: 'ok', label: 'Ranking', detail: rankingState().detail };
+}
+
+// Printed after the checks when semantic ranking is NOT active: exactly how to
+// turn it on, both the zero-tooling hosted path and the advanced local path.
+function printRankingHelp(): void {
+  console.log('');
+  console.log('Ranking: keyword (the default) works offline with no setup. Semantic (LLM)');
+  console.log('ranking is optional and only sharpens result ordering. To enable it:');
+  console.log('');
+  console.log('  • Hosted (no local tooling):');
+  console.log('      export STARLOG_API_KEY=...        # routes search through the hosted ranker');
+  console.log('  • Local (advanced, needs Go):');
+  console.log('      go install github.com/noperator/siftrank/cmd/siftrank@latest');
+  console.log('      export OPENROUTER_API_KEY=...      # siftrank ranks via OpenRouter');
+  console.log('');
+  console.log('  Override the model with STARLOG_RANK_MODEL (default: anthropic/claude-haiku-4.5).');
 }
 
 // ── Orchestrator ────────────────────────────────────────────────────────────
@@ -289,6 +309,10 @@ export async function runDoctor(): Promise<number> {
   checks.push(await checkRanker());
 
   for (const c of checks) print(c);
+
+  // When running on the offline keyword default, show exactly how to turn on
+  // the optional semantic ranking -- the one piece of config most users ask about.
+  if (rankingState().tier === 'keyword') printRankingHelp();
 
   const failures = checks.filter((c) => c.level === 'fail').length;
   const warnings = checks.filter((c) => c.level === 'warn').length;

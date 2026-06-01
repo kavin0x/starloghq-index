@@ -111,11 +111,11 @@ starlog search "auth for a Next.js app"
 ```
 #   Library             Category          Score   Solves
 --------------------------------------------------------------------------------
-1   Auth0 Next.js SDK   authentication    100.00  Implements user authentication in Next.js applications using Auth0 ...
-2   Clerk               authentication    61.82   Provides a fully managed authentication and user management platfor...
+1   Auth0 Next.js SDK   authentication    71.36   Implements user authentication in Next.js applications using Auth0 ...
+2   Clerk               authentication    60.64   Provides a fully managed authentication and user management platfor...
 ```
 
-Out of the box this uses the **local keyword ranker** — no API key, no network — which scores each library by how well its capability data matches your query. Enable **semantic ranking** (install the `siftrank` binary + set `OPENROUTER_API_KEY`, or set a hosted `STARLOG_API_KEY`) and results reorder by deeper relevance; add `--context "<your project>"` to also generate a per-library `vs custom` rationale (why reach for this instead of hand-rolling it).
+Out of the box this uses the **local keyword ranker** — no API key, no network. Scores are absolute (a strong match lands in the 70s–80s; weak matches stay low), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer. See [**Ranking**](#ranking) to optionally enable semantic ranking, and `--context` below for `vs custom` analysis.
 
 Options:
 
@@ -126,6 +126,31 @@ Options:
 --format <type>     Output format: table or json
 --context <desc>    Project context to tailor the "vs custom" rationale
 ```
+
+## Ranking
+
+Starlog picks a ranking mode automatically, in this order:
+
+| Mode | When it's used | Setup |
+|---|---|---|
+| **Keyword** (default) | always, unless a mode below is configured | none — offline, no key, no network |
+| **Local semantic** | `siftrank` binary present **and** `OPENROUTER_API_KEY` set | needs Go (see below) |
+| **Hosted semantic** | `STARLOG_API_KEY` set | just the env var |
+
+**Keyword is the default and is the honest baseline** — it matches your query against each library's capability data and reports an *absolute* score, so an off-topic or out-of-corpus query returns "no strong match" instead of a forced result. Semantic ranking is **optional** and only sharpens the ordering.
+
+Run **`starlog doctor`** any time to see which mode is active and how to change it. To enable semantic ranking:
+
+```bash
+# Hosted — no local tooling:
+export STARLOG_API_KEY=...
+
+# Local — needs the Go toolchain:
+go install github.com/noperator/siftrank/cmd/siftrank@latest
+export OPENROUTER_API_KEY=...        # siftrank ranks via OpenRouter
+```
+
+Override the ranking model with `STARLOG_RANK_MODEL` (default `anthropic/claude-haiku-4.5`). With semantic ranking on, add `--context "<your project>"` to also get a per-library **`vs custom`** rationale.
 
 ## Auto-registry hook
 
