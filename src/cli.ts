@@ -6,6 +6,8 @@ import { runSearch } from './search-service.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
 import { getPackageVersion } from './paths.js';
+import { detectAgents } from './install/detect.js';
+import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
 
 const VALID_CATEGORIES = KnownCategorySchema.options;
 
@@ -42,7 +44,11 @@ const program = new Command();
 program
   .name('starlog')
   .version(getPackageVersion())
-  .description('Capability indexing layer for AI coding agents');
+  .description('Capability indexing layer for AI coding agents')
+  .option('--no-telemetry', 'Disable anonymous usage telemetry for this run');
+
+/** True when the user passed --no-telemetry. */
+const noTelemetry = () => program.opts().telemetry === false;
 
 program
   .command('search')
@@ -79,6 +85,18 @@ program
       diversity_lambda: (opts as { diversity?: number }).diversity,
     });
 
+    await track(
+      'cli_search',
+      {
+        category: opts.category ?? null,
+        top_k: Number.isNaN(topK) ? null : topK,
+        result_count: results.length,
+        used_api: !!process.env.STARLOG_API_KEY,
+        format: opts.format,
+      },
+      { noTelemetry: noTelemetry() },
+    );
+
     if (results.length === 0) {
       console.error('No matching manifests found.');
       process.exit(0);
@@ -101,6 +119,21 @@ program
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
   .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean }) => {
     await runInit(opts);
+
+    const agents = detectAgents();
+    const detected = (Object.keys(agents) as (keyof typeof agents)[]).filter((k) => agents[k].detected);
+    await track(
+      'cli_init',
+      {
+        mode: opts.uninstall ? 'uninstall' : opts.dryRun ? 'dry-run' : 'apply',
+        project: !!opts.project,
+        all: !!opts.all,
+        yes: !!opts.yes,
+        agents_detected: detected,
+        agents_count: detected.length,
+      },
+      { noTelemetry: noTelemetry() },
+    );
   }));
 
 program
@@ -108,7 +141,29 @@ program
   .description('Diagnose your Starlog setup (corpus, MCP server, hook, agent configs)')
   .action(action('doctor failed', async () => {
     const code = await runDoctor();
+    await track('cli_doctor', { ok: code === 0, code }, { noTelemetry: noTelemetry() });
     process.exit(code);
+  }));
+
+program
+  .command('telemetry')
+  .description('Show or change anonymous usage telemetry (status | enable | disable)')
+  .argument('[action]', 'status (default), enable, or disable', 'status')
+  .action(action('telemetry command failed', async (action: string) => {
+    if (action === 'enable' || action === 'disable') {
+      setTelemetryEnabled(action === 'enable');
+      console.log(`Telemetry ${action}d.`);
+      return;
+    }
+    if (action !== 'status') {
+      console.error(`Unknown action "${action}". Use: status, enable, or disable.`);
+      process.exit(1);
+    }
+    const s = telemetryStatus();
+    console.log(`Telemetry: ${s.enabled ? 'enabled' : 'disabled'}`);
+    console.log(`Anonymous ID: ${s.anonymousId}`);
+    console.log(`Config: ${s.file}`);
+    console.log('Opt out anytime: STARLOG_TELEMETRY=0, DO_NOT_TRACK=1, or `starlog telemetry disable`.');
   }));
 
 // Backstop: anything that escapes an action handler still exits cleanly.

@@ -189,6 +189,25 @@ npx vitest run
 
 Unit tests cover schema validation, corpus loading, format output, and relevance ranking. All tests run without API keys or external binaries.
 
+## Telemetry
+
+Starlog collects **anonymous, opt-out** usage telemetry to understand which
+commands and capabilities are used. It sends: the command run
+(`init`/`search`/`doctor`), the CLI/Node/OS version, which agents were detected,
+and coarse result counts. It **never** sends your search queries, file paths,
+usernames, hostnames, or any file contents. It's also disabled automatically in
+CI and test runs.
+
+A one-line notice is printed on first run. Opt out at any time:
+
+```bash
+starlog telemetry disable          # persistent opt-out
+starlog telemetry status           # see current state + anonymous id
+export STARLOG_TELEMETRY=0         # env opt-out
+export DO_NOT_TRACK=1              # honored too
+starlog <command> --no-telemetry   # one-off
+```
+
 ## Links
 
 - Website: [starlog.dev](https://starlog.dev)
