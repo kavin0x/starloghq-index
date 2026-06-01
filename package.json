@@ -23,7 +23,8 @@
   "author": "Starlog",
   "type": "module",
   "bin": {
-    "starlog": "dist/cli.js"
+    "starlog": "dist/cli.js",
+    "starloghq": "dist/cli.js"
   },
   "files": [
     "dist/",

@@ -68,6 +68,12 @@ check "global install succeeds" $?
 # ── Checks ───────────────────────────────────────────────────────────────
 command -v starlog >/dev/null 2>&1; check "starlog binary is on PATH" $?
 
+# The package is named `starloghq` but the primary bin is `starlog`. Without a
+# matching `starloghq` bin, `npx starloghq ...` (the README's quick-start) can't
+# resolve an executable and errors out -- so `npx starloghq init` never runs.
+# This alias is what makes the npx flow work; assert it's linked.
+command -v starloghq >/dev/null 2>&1; check "starloghq binary is on PATH (npx <pkg> resolution)" $?
+
 VER="$(starlog --version 2>/dev/null)"
 echo "  (reported version: ${VER:-<none>})"
 if [ -n "${STARLOG_EXPECT_VERSION:-}" ]; then
