@@ -31,10 +31,13 @@ export async function search(
   }
 
   // Step 2: Filter by stack_affinity (QENG-01)
+  // Exact (case-insensitive) match, not substring: a `react` filter must not
+  // pull in `react-native`/`react-router`. Mirrors jaccardSimilarity's
+  // set-membership semantics (L8).
   if (options.stack) {
     const stackLower = options.stack.toLowerCase();
     filtered = filtered.filter((m) =>
-      m.stack_affinity.some((s) => s.toLowerCase().includes(stackLower)),
+      m.stack_affinity.some((s) => s.toLowerCase() === stackLower),
     );
   }
 

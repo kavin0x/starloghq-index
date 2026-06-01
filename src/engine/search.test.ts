@@ -284,6 +284,20 @@ describe('search()', () => {
       );
     });
 
+    it('matches stack affinity exactly, not as a substring (L8)', async () => {
+      // `react` must not pull in `react-native` / `react-router`.
+      const reactLib = makeMockManifest({ id: 'react-lib', stack_affinity: ['react'] });
+      const reactNativeLib = makeMockManifest({ id: 'rn-lib', stack_affinity: ['react-native'] });
+
+      const results = await search('auth', [reactLib, reactNativeLib], {
+        stack: 'react',
+      }, { siftrank: createMockSiftrank(), llm: createMockLlm() });
+
+      const ids = results.map((r) => r.manifest.id);
+      expect(ids).toContain('react-lib');
+      expect(ids).not.toContain('rn-lib');
+    });
+
     it('stack + category combined narrows results', async () => {
       const categoryOnly = await search('auth', allManifests, {
         category: 'authentication',

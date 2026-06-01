@@ -1,18 +1,25 @@
 # Starlog
 
-**Capability manifests for AI coding agents.**
+**Better library decisions for your AI coding agent — free, local, no account.**
 
-AI coding agents (Claude Code, Cursor, Copilot) rely on training data to pick libraries. The results are bad: agents recommend only 32-39 unique libraries across projects, show 83% inconsistency between model versions, and build custom implementations 60% of the time -- even when battle-tested libraries exist.
+AI coding agents (Claude Code, Cursor, Copilot) pick libraries from training data. The results are weak: agents draw from only 32–39 unique libraries across projects, flip their recommendation 83% of the time between model versions, and hand-roll custom implementations ~60% of the time even when a battle-tested library already exists.
 
-Starlog fixes this with structured capability manifests generated from code analysis. This repo bundles the free-tier corpus (25 manifests across 7 categories); the full hosted index is available via the Starlog API.
+Starlog gives your agent a structured, queryable index of library capabilities so it stops guessing. It runs locally as an MCP tool and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
 
 **Benchmarked across 1,008 runs on 3 Claude models:**
 
-- **11.3pp DIY rate reduction** (17% baseline to 5.7% with Starlog)
-- **Authentication**: 39.6% DIY drops to 20.8%
-- **Feature flags**: 37.5% DIY drops to 4.2%
-- **100% tool adoption** -- agents use Starlog every time it's available
-- **Works across all 3 models** (Sonnet 4.5, Opus 4.5, Opus 4.6)
+- **11.3pp fewer hand-rolled implementations** (17% → 5.7%)
+- **Authentication**: 39.6% → 20.8% custom code
+- **Feature flags**: 37.5% → 4.2% custom code
+- **100% tool adoption** — agents use it every time it's available
+- **Consistent across models** (Sonnet 4.5, Opus 4.5, Opus 4.6)
+
+## What you get
+
+- **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets ranked, structured answers instead of training-data recall.
+- **Package-install hook** — fires on `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces a library's `skip_when` conditions and alternatives *before* your agent commits to it.
+- **`starlog search` CLI** — query the same index directly from your terminal.
+- **Runs entirely on your machine** — the engine and corpus are local. No account, no key, no network call required.
 
 ## Quick start
 
@@ -20,28 +27,29 @@ Starlog fixes this with structured capability manifests generated from code anal
 npx starloghq init
 ```
 
-This wires everything into Claude Code automatically:
+This wires Starlog into Claude Code:
 
-- **MCP server** added to `~/.claude/settings.json` -- exposes the `starlog_search` tool
-- **PostToolUse hook** installed -- fires on `npm install`/`pnpm add`/`yarn add`/`pip install` and surfaces skip_when conditions and alternatives from the manifest corpus
-- All operations are **idempotent** -- safe to re-run
+- **MCP server** added to `~/.claude/settings.json` — exposes the `starlog_search` tool
+- **PostToolUse hook** installed — surfaces `skip_when` conditions and alternatives on package installs
+- Previews every change and asks before writing; **idempotent** and safe to re-run
 
-For repeated use, install globally so the `starlog` command is always on your PATH:
+Install globally so the `starlog` command is always on your PATH:
 
 ```bash
 npm install -g starloghq
 starlog init
 ```
 
-Add `--project` to also inject CLAUDE.md instructions into your current project, telling Claude to always consult Starlog before recommending libraries:
+Add `--project` to also drop Starlog guidance into your project's `CLAUDE.md`:
 
 ```bash
 starlog init --project
 ```
 
-To remove the integration cleanly:
+Preview without writing, or remove cleanly:
 
 ```bash
+starlog init --dry-run
 starlog init --uninstall
 ```
 
@@ -53,9 +61,9 @@ cd starlog-index && npm install
 npx tsx src/cli.ts init
 ```
 
-### Manual setup
+### Manual MCP setup
 
-`starlog init` writes this for you with an absolute path resolved automatically. If you prefer to configure manually, add to `~/.claude/settings.json`:
+`starlog init` writes this for you with an absolute path resolved automatically. To configure by hand, add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -68,11 +76,9 @@ npx tsx src/cli.ts init
 }
 ```
 
-Replace `/path/to/starloghq` with the install location (`$(npm root -g)/starloghq` for a global install, or your clone directory when running from source). The MCP server exposes a single tool -- `starlog_search` -- that accepts natural language queries with optional category, stack, and top_k filters.
+Replace `/path/to/starloghq` with the install location (`$(npm root -g)/starloghq` for a global install, or your clone directory from source). The server exposes one tool — `starlog_search` — accepting a natural-language query with optional `category`, `stack`, and `top_k` filters.
 
 ## CLI usage
-
-For direct queries outside an agent context (after `npm install -g starloghq`):
 
 ```bash
 starlog search "auth for Next.js SaaS"
@@ -96,25 +102,23 @@ Options:
 --stack <stack>     Filter by stack affinity (e.g., "next.js", "python")
 --top-k <n>         Number of results (default: 5)
 --format <type>     Output format: table or json
---context <desc>    Project context for vs_custom analysis
+--context <desc>    Project context to tailor the "vs custom" rationale
 ```
-
-To query the full hosted index instead of the bundled free-tier corpus, set `STARLOG_API_KEY` -- the CLI and MCP server will delegate to the Starlog API automatically.
 
 ## Auto-registry hook
 
-Starlog grows its corpus organically. When an AI agent installs a package that has no manifest, the PostToolUse hook queues it:
+The corpus grows from what you actually install. When your agent installs a package that has no manifest yet, the hook records it:
 
 ```
 [Starlog] Queued "drizzle-orm" for manifest generation (no existing manifest found).
 ```
 
-Queued packages are written to a project-local log (`.starlog/pending.json`) and a global queue (`~/.starlog/pending.json`), then added to the index automatically.
+Queued packages are written to a project-local log (`.starlog/pending.json`) and a global queue (`~/.starlog/pending.json`).
 
 ## How it works
 
 ```
-Corpus (bundled free-tier manifests + hosted full index)
+Corpus (local capability manifests)
     |
     v
 Query Engine (keyword matching + relevance scoring)
@@ -123,19 +127,19 @@ Query Engine (keyword matching + relevance scoring)
 Transport (MCP server or CLI)
 ```
 
-Each manifest is a structured description of a library -- not documentation, but **capability data**: what it solves, which stacks it fits, integration effort, when to skip it, and hosted alternatives.
+Each manifest is a structured description of a library — not documentation, but **capability data**: what it solves, which stacks it fits, integration effort, and when to skip it.
 
-**Stored fields** (in manifests): `id`, `name`, `category`, `solves`, `stack_affinity`, `integration_effort`, `best_for`, `skip_when`, `hosted_alternative`, `health`, `quality`
+**Stored fields:** `id`, `name`, `category`, `solves`, `stack_affinity`, `integration_effort`, `best_for`, `skip_when`, `health`, `quality`
 
-**Computed fields** (at query time): `relevance_score`, `context_fit`, `vs_custom`, `tradeoffs`
+**Computed at query time:** `relevance_score`, `context_fit`, `vs_custom`, `tradeoffs`
 
-This separation means the corpus is static and cacheable while analysis adapts to each query's context.
+The corpus is static and cacheable; the analysis adapts to each query's context.
 
 ## Benchmark results
 
 Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-spa, node-cli), 7 categories, 3 repetitions per configuration.
 
-### DIY rate reduction by category
+### Custom-code rate reduction by category
 
 | Category | Baseline | With Starlog | Reduction |
 |---|---|---|---|
@@ -147,7 +151,7 @@ Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-s
 | Email | 2.1% | 6.3% | +4.2pp |
 | ORM/Database | 0% | 0% | 0pp |
 
-### DIY rate reduction by model
+### Custom-code rate reduction by model
 
 | Model | Baseline | With Starlog | Reduction |
 |---|---|---|---|
@@ -157,11 +161,11 @@ Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-s
 
 ### Known limitation: diversity trade-off
 
-Starlog reduces recommendation diversity by ~30%. Manifests narrow the option space -- agents converge on fewer libraries. This is actively being investigated. The DIY reduction holds across both context-injection and tool-use delivery mechanisms, suggesting it's a property of the data, not the transport.
+Starlog reduces recommendation diversity by ~30%. Manifests narrow the option space — agents converge on fewer libraries. This is actively being investigated. The reduction in hand-rolled code holds across both context-injection and tool-use delivery, suggesting it's a property of the data, not the transport.
 
 ## Categories
 
-The bundled free-tier corpus covers 7 categories:
+The bundled corpus covers 7 categories:
 
 | Category | Examples |
 |---|---|
@@ -173,7 +177,7 @@ The bundled free-tier corpus covers 7 categories:
 | Feature Flags | LaunchDarkly, PostHog, Flagsmith, ConfigCat, DevCycle |
 | Caching | ioredis, Upstash Redis, Keyv, Cacheable |
 
-Each manifest includes health signals (stars, downloads, last commit, contributors), quality indicators (tests, docs, types, maintenance status), and competitive context (hosted alternatives, alternative IDs). The full hosted index covers more libraries per category and expands dynamically via the auto-registry hook.
+Each manifest carries health signals (stars, downloads, last commit, contributors) and quality indicators (tests, docs, types, maintenance status).
 
 ## Testing
 
@@ -183,6 +187,10 @@ npx vitest run
 
 Unit tests cover schema validation, corpus loading, format output, and relevance ranking. All tests run without API keys or external binaries.
 
+## Links
+
+- Website: [starlog.dev](https://starlog.dev)
+
 ## License
 
-MIT
+Business Source License 1.1 — see [LICENSE](LICENSE). Source-available; converts to Apache-2.0 on the change date.

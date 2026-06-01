@@ -1,7 +1,26 @@
 {
   "name": "starloghq",
   "version": "0.1.0",
-  "description": "Capability indexing layer for AI coding agents",
+  "description": "Better library decisions for your AI coding agent — a local MCP tool and package-install hook that indexes library capabilities. Free, no account.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "coding-agent",
+    "claude",
+    "claude-code",
+    "library-recommendations",
+    "capability-manifest"
+  ],
+  "homepage": "https://starlog.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/starloghq/index.git"
+  },
+  "bugs": {
+    "url": "https://github.com/starloghq/index/issues"
+  },
+  "author": "Starlog",
   "type": "module",
   "bin": {
     "starlog": "dist/cli.js"
@@ -17,15 +36,18 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "BUSL-1.1",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^14.0.3",
     "dotenv": "^17.4.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.100.0",
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
     "tsx": "^4.22.3",
