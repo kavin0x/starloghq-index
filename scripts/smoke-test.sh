@@ -106,6 +106,19 @@ check "PostToolUse hook script is written" $?
 starlog doctor 2>&1 | grep -qi "starlog_search available"
 check "doctor (post-init) confirms MCP handshake" $?
 
+# Regression: the MCP server must start even when invoked through a symlinked
+# path. The run-if-main guard once string-compared argv[1] (as-invoked) against
+# a realpath-resolved import.meta.url, so any symlinked path (macOS
+# /tmp -> /private/tmp, some nvm/Homebrew layouts, npx caches) made the server
+# silently never start. Docker's /tmp is NOT symlinked, so only an explicit
+# symlink reproduces it -- which is exactly why earlier gates missed it.
+MCP_JS="$(npm root -g)/starloghq/dist/mcp.js"
+LINK="$WORK/linked-pkg"
+ln -s "$(dirname "$(dirname "$MCP_JS")")" "$LINK"
+INIT_REQ='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+{ printf '%s\n' "$INIT_REQ"; sleep 1; } | node "$LINK/dist/mcp.js" 2>/dev/null | grep -q '"serverInfo"'
+check "MCP server starts through a symlinked path (run-if-main guard)" $?
+
 # Uninstall must remove the MCP server entry.
 starlog init --uninstall -y >/dev/null 2>&1
 check "uninstall runs cleanly" $?

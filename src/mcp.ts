@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod/v4';
@@ -72,9 +73,23 @@ export async function startMcpServer(): Promise<void> {
 // Run-if-main guard: auto-start when executed directly (node dist/mcp.js, the
 // command wired into settings.json), but stay importable for tests without
 // opening stdio.
-const invokedDirectly =
-  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+//
+// Both sides are run through realpathSync before comparing. `import.meta.url`
+// is already symlink-resolved by the loader, but `process.argv[1]` is the path
+// exactly as the parent invoked it -- so on any install whose path crosses a
+// symlink (macOS `/tmp -> /private/tmp`, some nvm/Homebrew layouts, an npx
+// cache dir), a raw string compare is unequal and the server silently never
+// starts. Canonicalizing both makes the guard fire regardless of symlinks.
+function invokedDirectly(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
 
-if (invokedDirectly) {
+if (invokedDirectly()) {
   await startMcpServer();
 }
