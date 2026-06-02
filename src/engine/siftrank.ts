@@ -173,7 +173,13 @@ export const keywordSiftrank: SiftrankFn = async (manifests, query) => {
 
   // Document frequency per term -> inverse-frequency weight. A term matching
   // few manifests is a strong signal; one matching many is weak.
-  const N = manifests.length;
+  //
+  // idf is computed against a floored corpus size: a category/stack filter can
+  // shrink `manifests` to 2-3 entries, which would collapse idf toward 0 and
+  // push every score below the relevance floor (an in-category search returning
+  // nothing). The floor keeps scores calibrated to a full-corpus scale so
+  // filtered searches still rank and clear the floor.
+  const N = Math.max(manifests.length, 12);
   const idf = new Map<string, number>();
   for (const t of terms) {
     let df = 0;

@@ -26,16 +26,35 @@ describe('parseApiResults()', () => {
   beforeEach(() => { errSpy = vi.spyOn(console, 'error').mockImplementation(() => {}); });
   afterEach(() => { errSpy.mockRestore(); });
 
-  it('maps a valid payload, carrying _score into relevance_score', () => {
-    const results = parseApiResults([validManifest({ _score: 87 })]);
-    expect(results).toHaveLength(1);
-    expect(results[0].manifest.id).toBe('clerk');
-    expect(results[0].relevance_score).toBe(87);
+  it('parses the hosted envelope { results: [{ rank, score, manifest }] }', () => {
+    const results = parseApiResults({
+      query: 'auth', category: 'all', total_manifests: 90, results_count: 2,
+      results: [
+        { rank: 1, score: 25, manifest: validManifest({ id: 'auth0' }) },
+        { rank: 2, score: 25, manifest: validManifest({ id: 'clerk' }) },
+      ],
+    });
+    expect(results.map((r) => r.manifest.id)).toEqual(['auth0', 'clerk']);
+    // Score derived from rank (the API's own score is flat) -> monotonic desc.
+    expect(results[0].relevance_score).toBe(100);
+    expect(results[1].relevance_score).toBeLessThan(results[0].relevance_score);
   });
 
-  it('defaults relevance_score to 0 when _score is missing', () => {
+  it('orders by rank even if the envelope is out of order', () => {
+    const results = parseApiResults({
+      results: [
+        { rank: 2, manifest: validManifest({ id: 'clerk' }) },
+        { rank: 1, manifest: validManifest({ id: 'auth0' }) },
+      ],
+    });
+    expect(results.map((r) => r.manifest.id)).toEqual(['auth0', 'clerk']);
+  });
+
+  it('still accepts a bare array of manifests (legacy/forward-compat)', () => {
     const results = parseApiResults([validManifest()]);
-    expect(results[0].relevance_score).toBe(0);
+    expect(results).toHaveLength(1);
+    expect(results[0].manifest.id).toBe('clerk');
+    expect(results[0].relevance_score).toBe(100);
   });
 
   it('skips malformed entries but keeps valid ones', () => {
@@ -89,7 +108,7 @@ describe('runSearch() API tier', () => {
       ok: true,
       status: 200,
       statusText: 'OK',
-      json: async () => [validManifest({ id: 'auth0', _score: 99 })],
+      json: async () => ({ results: [{ rank: 1, score: 25, manifest: validManifest({ id: 'auth0' }) }] }),
     }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -97,7 +116,7 @@ describe('runSearch() API tier', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(results).toHaveLength(1);
     expect(results[0].manifest.id).toBe('auth0');
-    expect(results[0].relevance_score).toBe(99);
+    expect(results[0].relevance_score).toBe(100);
   });
 
   it('falls back to the local corpus (no throw) when the API request fails', async () => {
@@ -110,21 +129,26 @@ describe('runSearch() API tier', () => {
     expect(errSpy).toHaveBeenCalled();          // logged the fallback
   });
 
-  it('returns [] when the API legitimately finds nothing (trusts the authority)', async () => {
+  it('falls back to local when the API returns no usable results', async () => {
+    // Empty/whiffed API response must NOT black-hole the search -- fall through
+    // to the local corpus (the safety net) rather than return [] for an
+    // in-corpus query.
     const fetchMock = vi.fn(async () => ({
-      ok: true, status: 200, statusText: 'OK', json: async () => [],
+      ok: true, status: 200, statusText: 'OK', json: async () => ({ results: [] }),
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const results = await runSearch({ query: 'nonexistent-capability' });
+    const results = await runSearch({ query: 'authentication', category: 'authentication' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(results).toEqual([]); // did NOT fall back to local for a genuine empty
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBeGreaterThan(0); // local answered
+    expect(errSpy).toHaveBeenCalled();
   });
 
   it('falls back to local when a non-empty API payload fails validation entirely (shape drift)', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true, status: 200, statusText: 'OK',
-      json: async () => [{ id: 'broken', category: 'authentication' }, { nope: true }],
+      json: async () => ({ results: [{ rank: 1, manifest: { id: 'broken', category: 'authentication' } }, { rank: 2, manifest: { nope: true } }] }),
     }));
     vi.stubGlobal('fetch', fetchMock);
 

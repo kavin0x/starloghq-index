@@ -17,42 +17,57 @@ const API_TIMEOUT_MS = 10_000;
 
 /**
  * Convert a hosted-API JSON payload into validated QueryResult[].
- * Each entry is validated against the manifest schema; malformed entries are
- * skipped (with a stderr warning) rather than trusted blindly — otherwise a
- * shape mismatch would crash the formatter at render time. A non-array payload
- * yields an empty list.
  *
- * API CONTRACT: each element of the `https://api.starlog.dev/search` response
- * MUST conform to `CapabilityManifestSchema` (full `health`/`quality` objects
- * included), optionally plus a numeric `_score`. Entries that don't match are
- * dropped here — so if the hosted API's response shape ever diverges from the
- * stored-manifest schema, results silently disappear. Keep the two in sync.
+ * API CONTRACT (`https://api.starlog.dev/search`): an envelope
+ *   { query, category, total_manifests, results_count,
+ *     results: [ { rank, score, manifest: <CapabilityManifest> } ] }
+ * ordered by `rank` (1 = best). A bare array of manifest objects (optionally
+ * with `_score`) is also accepted for forward/backward compatibility.
+ *
+ * Each manifest is validated against `CapabilityManifestSchema`; malformed
+ * entries are skipped (with a stderr warning) rather than trusted blindly.
+ * The API's own `score` is flat for top hits, so the displayed relevance is
+ * derived from rank position (higher = better) to stay monotonic.
  */
 export function parseApiResults(payload: unknown): QueryResult[] {
-  if (!Array.isArray(payload)) {
-    console.error('[starlog] API returned a non-array payload; ignoring.');
-    return [];
-  }
+  const rawItems: unknown[] = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === 'object' && Array.isArray((payload as { results?: unknown[] }).results)
+      ? (payload as { results: unknown[] }).results
+      : [];
 
+  // Normalize to { manifest record, rank }, preferring the envelope's nested
+  // `manifest` and `rank`; for a bare array, the item IS the manifest.
+  const entries = rawItems
+    .map((item, i) => {
+      if (item === null || typeof item !== 'object') return null;
+      const obj = item as Record<string, unknown>;
+      const record = obj.manifest && typeof obj.manifest === 'object'
+        ? (obj.manifest as Record<string, unknown>)
+        : obj;
+      const rank = typeof obj.rank === 'number' ? obj.rank : i + 1;
+      return { record, rank };
+    })
+    .filter((e): e is { record: Record<string, unknown>; rank: number } => e !== null)
+    .sort((a, b) => a.rank - b.rank);
+
+  const n = entries.length;
   const results: QueryResult[] = [];
-  for (const item of payload) {
-    if (item === null || typeof item !== 'object') continue;
-    const record = item as Record<string, unknown>;
-    const score = typeof record._score === 'number' ? record._score : 0;
-    const parsed = CapabilityManifestSchema.safeParse(record);
+  entries.forEach((e, i) => {
+    const parsed = CapabilityManifestSchema.safeParse(e.record);
     if (!parsed.success) {
-      const id = typeof record.id === 'string' ? record.id : '(unknown)';
+      const id = typeof e.record.id === 'string' ? e.record.id : '(unknown)';
       console.error(`[starlog] skipping malformed API manifest "${id}".`);
-      continue;
+      return;
     }
     results.push({
       manifest: parsed.data,
-      relevance_score: score,
+      relevance_score: n > 0 ? Math.round((100 * (n - i)) / n * 100) / 100 : 0,
       vs_custom: '',
       context_fit: '',
       tradeoffs: [],
     });
-  }
+  });
   return results;
 }
 
@@ -82,15 +97,14 @@ export async function runSearch(args: SearchArgs): Promise<QueryResult[]> {
       if (response.ok) {
         const payload = await response.json();
         const apiResults = parseApiResults(payload);
-        // Distinguish "API legitimately found nothing" (trust it, return [])
-        // from "API returned results but none survived validation" — the
-        // latter is shape-drift, so fall through to the local corpus rather
-        // than masquerade a bug as an empty result set.
-        const droppedEverything = Array.isArray(payload) && payload.length > 0 && apiResults.length === 0;
-        if (!droppedEverything) {
+        // Return the hosted results when there are any; otherwise fall through
+        // to the local corpus rather than surfacing an empty result set for an
+        // in-corpus query (an unrecognized shape or a backend hiccup must never
+        // black-hole the search — the local keyword ranker is the safety net).
+        if (apiResults.length > 0) {
           return apiResults;
         }
-        console.error(`[starlog] API returned ${payload.length} result(s) but none matched the manifest schema; using local corpus.`);
+        console.error('[starlog] API returned no usable results; using local corpus.');
       } else {
         console.error(`[starlog] API error ${response.status} ${response.statusText}; using local corpus.`);
       }
