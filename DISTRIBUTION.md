@@ -15,19 +15,22 @@ manifests; the rest is submission + launch work.
 Both manifests depend on the `starlog mcp` subcommand (added in 0.1.8). Keep the
 `version` fields in `server.json` in sync with `package.json` at release time.
 
-## Submission checklist (outward-facing — do these by hand)
+## Submission checklist
 
-- [ ] **Official MCP Registry** — publish `server.json` with the
-      [`mcp-publisher` CLI](https://github.com/modelcontextprotocol/registry/blob/main/docs/guides/publishing/publish-server.md).
-      Requires GitHub auth as the `starloghq` org to claim the `io.github.starloghq/*`
-      namespace.
+- [x] **Official MCP Registry** — published via the
+      [`mcp-publisher` CLI](https://github.com/modelcontextprotocol/registry/blob/main/docs/guides/publishing/publish-server.md)
+      as `io.github.starloghq/starlog` (npm 0.1.9, which carries the required
+      `mcpName` field). Re-run `mcp-publisher publish` after each release to
+      bump the listed version. Namespace auth requires **public** `starloghq` org
+      membership (publicized for `basicScandal`).
+- [x] **awesome-mcp-servers** — PR [#7250](https://github.com/punkpeye/awesome-mcp-servers/pull/7250)
+      (awaiting maintainer merge).
 - [ ] **Smithery** — connect the `starloghq/index` repo at smithery.ai; it reads
-      `smithery.yaml`.
-- [ ] **Glama** — https://glama.ai/mcp/servers (auto-indexes public GitHub MCP
-      repos; can also submit). Gets you the score badge used elsewhere.
-- [ ] **PulseMCP** — https://www.pulsemcp.com (submit form).
+      `smithery.yaml`. (GitHub-app authorize flow — needs a browser login.)
+- [ ] **Glama** — https://glama.ai/mcp/servers — auto-indexes public GitHub MCP
+      repos; usually picks up the repo on its own. Claim it to get the score badge.
+- [ ] **PulseMCP** — https://www.pulsemcp.com (crawls + submit form).
 - [ ] **mcp.so** — https://mcp.so (submit form).
-- [ ] **awesome-mcp-servers** — PR adding the entry below.
 
 ### awesome-mcp-servers entry
 
