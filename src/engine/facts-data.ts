@@ -35,6 +35,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: 'Pulled transitively by build tooling that links liblzma.',
     source: 'NVD CVE-2024-3094; Andres Freund disclosure 2024-03-29 (oss-security).',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'event-stream',
@@ -55,6 +56,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: 'The payload lived in the transitive dep flatmap-stream, not event-stream itself.',
     source: 'npm/GitHub advisory 2018; widely documented (Snyk, npm blog).',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'ua-parser-js',
@@ -75,6 +77,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: 'Frequently a transitive dep — pin away from the three bad versions.',
     source: 'GitHub Security Advisory + CISA alert, Oct 2021.',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'node-ipc',
@@ -95,6 +98,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: 'Pulled transitively by some popular packages at the time.',
     source: 'NVD CVE-2022-23812; widely reported March 2022.',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'colors',
@@ -115,6 +119,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: 'Extremely common transitive dep.',
     source: 'Widely reported Jan 2022 (Bleeping Computer, GitHub).',
     verified: true,
+    last_verified: '2026-06-01',
   },
 
   // ── Stale / abandoned (prefer-alternative) ─────────────────────────────
@@ -129,6 +134,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: null,
     source: 'Officially deprecated Feb 2020 (request#3142); no longer maintained.',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'moment',
@@ -141,6 +147,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: null,
     source: 'momentjs.com project-status: maintenance mode, not recommended for new projects.',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'left-pad',
@@ -153,6 +160,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: null,
     source: 'Trivial by inspection; 2016 unpublish incident is the cautionary tale.',
     verified: true,
+    last_verified: '2026-06-01',
   },
 
   // ── License trap ───────────────────────────────────────────────────────
@@ -168,6 +176,7 @@ export const FACT_STUBS: FactRecord[] = [
       'Relicensed Apache-2.0 → AGPL-3.0 at v8 (2021). Forking/modifying a self-hosted, network-served closed-source product can trigger AGPL source-disclosure.',
     source: 'Grafana Labs relicense announcement, 2021 (AGPLv3 from v8).',
     verified: true,
+    last_verified: '2026-06-01',
   },
 
   // ── Clean (control-correct: facts must NOT flip a good default) ─────────
@@ -182,6 +191,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: null,
     source: 'Active, permissive, no known advisories (baseline clean control).',
     verified: true,
+    last_verified: '2026-06-01',
   },
   {
     package: 'date-fns',
@@ -194,6 +204,7 @@ export const FACT_STUBS: FactRecord[] = [
     transitive_risk: null,
     source: 'Active, permissive, no known advisories (baseline clean control).',
     verified: true,
+    last_verified: '2026-06-01',
   },
 ];
 

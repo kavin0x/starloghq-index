@@ -56,6 +56,8 @@ describe('starlog MCP server — facts tool', () => {
     const text = toolText(result);
     expect(text).toContain('ua-parser-js');
     expect(text).toContain('INCIDENT:ua-parser-js-2021');
+    // recency is surfaced as a dated "as of" line
+    expect(text).toMatch(/as of \d{4}-\d{2}-\d{2}/);
     await client.close();
   });
 

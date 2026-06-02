@@ -32,5 +32,12 @@ export const FactRecordSchema = z.object({
   // it may be served (public corpus or org-private overlay).
   source: z.string(),
   verified: z.boolean(),
+  // Recency — the date (YYYY-MM-DD) this record was last confirmed accurate.
+  // Required: a static facts corpus goes WRONG when stale (a "clean" record
+  // becomes false the day a CVE drops), so every served fact must declare when
+  // it was last verified. Surfaced as an "as of <date>" line in the output, and
+  // enforced on org-private records too (a record missing/malforming this is
+  // skipped by the overlay loader).
+  last_verified: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'last_verified must be an ISO date (YYYY-MM-DD)'),
 });
 export type FactRecord = z.infer<typeof FactRecordSchema>;

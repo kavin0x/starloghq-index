@@ -74,6 +74,7 @@ describe('loadFactMap', () => {
       transitive_risk: null,
       source: 'test fixture',
       verified: true,
+      last_verified: '2026-01-01',
       ...overrides,
     };
   }

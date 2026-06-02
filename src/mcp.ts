@@ -93,6 +93,9 @@ export function formatFacts(pkg: string, rec: FactRecord | null): string {
     lines.push(`**Transitive risk:** ${rec.transitive_risk}`);
   }
   lines.push(`**Source:** ${rec.source}`);
+  // Recency is load-bearing for correctness: a "no known vulns" record can go
+  // stale. Surface when it was last confirmed so the reader can weigh it.
+  lines.push(`**Verified:** as of ${rec.last_verified}`);
   return lines.join('\n');
 }
 
