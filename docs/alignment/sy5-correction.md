@@ -32,7 +32,7 @@ schemas, `evaluatePolicy`, and the `FactView` type, not the composer.)
 { "l1": L1CapabilityFact|null, "l2": L2Overlay|null, "l3": L3Policy|null, "found": boolean }
 ```
 
-- `l2` = public ⊕ org-private (server resolves private-wins, per D-D).
+- `l2` = public **unioned with** org-private. The server **does not pick a winner**: a private overlay *augments* public attestations and can **never suppress** a public signal (e.g. cannot hide an upstream CVE — union `known_vulns` by id). **This supersedes D-D's "private-wins" server-side resolution** — picking a winner is the arbitration the Master Plan SEAM-3 verdict forbids (starlog-startup `seam-verdicts.html` §3 / `index-builder.html` §6). Serve the full set with **no resolution scalar** ("firewall by absence"); precedence among conflicting same-predicate attestors is org-authored **L3**, never a server default. (Current shape is a single collapsed overlay; the SEAM-3 target is a multi-attestor `AttestationRecord` set with `attestor_id`/`as_of`/`predicate` — schema convergence, separate from this phase.)
 - `l3` = the org **policy**, not a verdict — the **client runs `evaluatePolicy`** (composition + L3 stay client-side; matches the no-collapse invariant). Server-side verdict + CT audit log is a later governance phase, explicitly not P3.5.
 - Client reads it with `parseFactsApiResponse` (reads `.l1/.l2/.l3`, defensive), falls back to local public on any error.
 
@@ -51,4 +51,4 @@ When built, both must EMIT the package schemas:
 
 ## Net
 
-Phase spine unchanged. The only deltas: import the package (not vendor), serve `{l1,l2,l3,found}`, split writes by layer, keep `evaluatePolicy` client-side. Everything else in sy5 (KV public / D1 private, org identity, `org_id`-from-key isolation, rate limiting) stands.
+Phase spine unchanged. The only deltas: import the package (not vendor), serve `{l1,l2,l3,found}`, **merge `l2` by union (private augments, never suppresses — no server-side winner-pick, supersedes D-D)**, split writes by layer, keep `evaluatePolicy` client-side. Everything else in sy5 (KV public / D1 private, org identity, `org_id`-from-key isolation, rate limiting) stands.
