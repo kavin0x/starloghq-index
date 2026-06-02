@@ -1,6 +1,10 @@
-# Starlog
+<p align="center">
+  <img src="assets/logo/starlog-avatar-A.png" alt="Starlog" width="120" height="120">
+</p>
 
-**Better library decisions for your AI coding agent — free, local, no account.**
+<h1 align="center">Starlog</h1>
+
+<p align="center"><strong>Better library decisions for your AI coding agent — free, local, no account.</strong></p>
 
 <p align="center">
   <img src="demo/starlog-demo.gif" alt="Starlog returning ranked library recommendations in the terminal, then wiring itself into Claude Code, Cursor, Copilot and Codex with one command" width="820">
