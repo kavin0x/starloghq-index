@@ -1,4 +1,4 @@
-import type { L2Overlay } from './l2-overlay.js';
+import type { L2Overlay } from '@starloghq/facts-schema';
 
 /**
  * Public L2 overlay (hand-authored stand-in for the future OSV/deps.dev pull).

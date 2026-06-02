@@ -3,11 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { composeFact, type ComposeDeps } from './compose.js';
-import { evaluatePolicy, type L3Policy } from './l3-policy.js';
+import { evaluatePolicy, type L3Policy } from '@starloghq/facts-schema';
 import { handAuthoredL2Source } from './l2-source.js';
 import { buildComposeDeps, lookupFactView } from './service.js';
-import type { L1CapabilityFact } from './l1-capability.js';
-import type { L2Overlay } from './l2-overlay.js';
+import type { L1CapabilityFact } from '@starloghq/facts-schema';
+import type { L2Overlay } from '@starloghq/facts-schema';
 
 const mkL1 = (o: Partial<L1CapabilityFact> = {}): L1CapabilityFact => ({
   package: 'p', ecosystem: 'npm', version_range: null, artifact_sha256: null,

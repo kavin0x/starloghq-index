@@ -1,5 +1,5 @@
-import { L2OverlaySchema, type L2Overlay } from './l2-overlay.js';
-import type { Ecosystem } from './l1-capability.js';
+import { L2OverlaySchema, type L2Overlay } from '@starloghq/facts-schema';
+import type { Ecosystem } from '@starloghq/facts-schema';
 
 /**
  * L2 source seam — the "consume, don't build" boundary.

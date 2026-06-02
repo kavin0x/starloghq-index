@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { L1CapabilityFactSchema } from './l1-capability.js';
-import { L2OverlaySchema, VulnSchema } from './l2-overlay.js';
-import { L3PolicySchema, L3RuleSchema } from './l3-policy.js';
+import { L1CapabilityFactSchema } from '@starloghq/facts-schema';
+import { L2OverlaySchema, VulnSchema } from '@starloghq/facts-schema';
+import { L3PolicySchema, L3RuleSchema } from '@starloghq/facts-schema';
 
 // Helpers building minimal-valid records per layer.
 const l1 = (o: Record<string, unknown> = {}) => ({

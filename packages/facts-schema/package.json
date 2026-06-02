@@ -1,0 +1,26 @@
+{
+  "name": "@starloghq/facts-schema",
+  "version": "0.1.0",
+  "description": "Canonical L1/L2/L3 facts contract for Starlog — zod schemas + policy semantics shared by the client and the API/worker. Zero deps except zod.",
+  "license": "BUSL-1.1",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src/",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

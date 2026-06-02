@@ -31,6 +31,9 @@
     "dist/",
     "corpus-free/"
   ],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "node build.mjs",
     "prepublishOnly": "npm run build",

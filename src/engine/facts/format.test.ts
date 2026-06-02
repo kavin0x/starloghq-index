@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { formatFactView } from './format.js';
 import type { FactView } from './compose.js';
-import type { L1CapabilityFact } from './l1-capability.js';
-import type { L2Overlay } from './l2-overlay.js';
+import type { L1CapabilityFact } from '@starloghq/facts-schema';
+import type { L2Overlay } from '@starloghq/facts-schema';
 
 const L1 = (o: Partial<L1CapabilityFact> = {}): L1CapabilityFact => ({
   package: 'p', ecosystem: 'npm', version_range: null, artifact_sha256: null,

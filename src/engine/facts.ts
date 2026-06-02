@@ -1,20 +1,22 @@
 /**
  * Public facts API — the LAYERED model.
  *
- * Three independent layers, composed at query time, never collapsed:
- *   L1 (immutable capability)  ./facts/l1-capability + l1-data
- *   L2 (mutable overlay)       ./facts/l2-overlay + l2-source + l2-data
- *   L3 (org policy)            ./facts/l3-policy
- *   composition                ./facts/compose + service + format
+ * Three independent layers, composed at query time, never collapsed. The
+ * SCHEMAS + policy semantics are the canonical contract `@starloghq/facts-schema`
+ * (shared with the API/worker); the DATA, sources, composition, and serving live
+ * here in the app:
+ *   contract (schemas, evaluatePolicy, FactView)  @starloghq/facts-schema
+ *   L1 data                                       ./facts/l1-data
+ *   L2 sources + data                             ./facts/l2-source + l2-data
+ *   composition + serving                         ./facts/compose + service + format
  *
  * Private inputs are independent: STARLOG_PRIVATE_FACTS feeds private L1+L2,
  * STARLOG_POLICY feeds L3 — wired in service.buildComposeDeps().
  */
 
-export * from './facts/l1-capability.js';
-export * from './facts/l2-overlay.js';
+export * from '@starloghq/facts-schema';
+
 export * from './facts/l2-source.js';
-export * from './facts/l3-policy.js';
 export * from './facts/compose.js';
 export * from './facts/service.js';
 export { formatFactView } from './facts/format.js';

@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { L1CapabilityFactSchema, type L1CapabilityFact } from './l1-capability.js';
-import { type L2Overlay } from './l2-overlay.js';
+import { L1CapabilityFactSchema, type L1CapabilityFact } from '@starloghq/facts-schema';
+import { type L2Overlay } from '@starloghq/facts-schema';
 import { handAuthoredL2Source, overlaySource, parseOverlay, type L2Source } from './l2-source.js';
-import { L3PolicySchema, type L3Policy } from './l3-policy.js';
+import { L3PolicySchema, type L3Policy } from '@starloghq/facts-schema';
 import { composeFact, type ComposeDeps, type FactView } from './compose.js';
 import { L1_BY_PACKAGE } from './l1-data.js';
 import { L2_BY_PACKAGE, L2_OVERLAYS_LIST } from './l2-data.js';

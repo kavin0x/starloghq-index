@@ -1,7 +1,8 @@
-import type { Ecosystem, L1CapabilityFact } from './l1-capability.js';
-import type { L2Overlay } from './l2-overlay.js';
+import type { Ecosystem, L1CapabilityFact, L2Overlay, FactView } from '@starloghq/facts-schema';
 import type { L2Source } from './l2-source.js';
-import { evaluatePolicy, type L3Policy, type L3Verdict } from './l3-policy.js';
+import { evaluatePolicy, type L3Policy } from '@starloghq/facts-schema';
+
+export type { FactView } from '@starloghq/facts-schema'; // re-export for app consumers
 
 /**
  * Composition — the ONLY place the three layers meet, and they meet at query
@@ -13,14 +14,6 @@ import { evaluatePolicy, type L3Policy, type L3Verdict } from './l3-policy.js';
  *   L2 (mutable overlay)       ─┼─►  composeFact()  ─►  FactView { l1, l2, l3 }
  *   L3 (org policy)            ─┘
  */
-
-export interface FactView {
-  package: string;
-  ecosystem: Ecosystem;
-  l1: L1CapabilityFact | null; // capability facts (or null if none on file)
-  l2: L2Overlay | null; // reputation/vuln overlay (or null)
-  l3: L3Verdict; // org suitability verdict ({ decision: 'none' } by default)
-}
 
 export interface ComposeDeps {
   /** Resolve a package name to its L1 capability fact (independent L1 lookup). */

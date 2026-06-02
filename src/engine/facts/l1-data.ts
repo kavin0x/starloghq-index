@@ -1,4 +1,4 @@
-import type { L1CapabilityFact } from './l1-capability.js';
+import type { L1CapabilityFact } from '@starloghq/facts-schema';
 
 /**
  * Public L1 capability facts (hand-authored stand-in for the future deterministic

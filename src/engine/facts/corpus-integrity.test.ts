@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { L1CapabilityFactSchema } from './l1-capability.js';
-import { L2OverlaySchema } from './l2-overlay.js';
+import { L1CapabilityFactSchema } from '@starloghq/facts-schema';
+import { L2OverlaySchema } from '@starloghq/facts-schema';
 import { L1_FACTS, L1_BY_PACKAGE } from './l1-data.js';
 import { L2_OVERLAYS_LIST, L2_BY_PACKAGE } from './l2-data.js';
 
