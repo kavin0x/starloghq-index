@@ -35,6 +35,7 @@
     "build": "node build.mjs",
     "prepublishOnly": "npm run build",
     "search": "tsx src/cli.ts search",
+    "bench:facts": "tsx scripts/bench-facts.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "smoke": "bash scripts/smoke-test.sh",
