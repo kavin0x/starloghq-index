@@ -112,6 +112,12 @@ check "PostToolUse hook script is written" $?
 starlog doctor 2>&1 | grep -qi "starlog_search available"
 check "doctor (post-init) confirms MCP handshake" $?
 
+# --api-key wires the hosted key into the MCP server's own env block (the server
+# doesn't inherit the user's shell, so this is the only way the agent gets it).
+( cd "$PROJECT" && starlog init --api-key smoke-test-key -y >/dev/null 2>&1 )
+grep -q 'smoke-test-key' "$HOME/.claude/settings.json"
+check "init --api-key wires STARLOG_API_KEY into the MCP server env" $?
+
 # Regression: the MCP server must start even when invoked through a symlinked
 # path. The run-if-main guard once string-compared argv[1] (as-invoked) against
 # a realpath-resolved import.meta.url, so any symlinked path (macOS

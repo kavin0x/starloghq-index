@@ -46,22 +46,32 @@ async function writeSettingsJson(settings: Settings): Promise<void> {
 /** The Starlog MCP server entry written into ~/.claude/settings.json. Shared
  *  by the apply path (configureMcpServer) and the preview path (buildInstallPlan)
  *  so the two can never disagree on what "already configured" means. */
-function desiredMcpServer() {
-  return {
+function desiredMcpServer(apiKey?: string) {
+  const entry: {
+    command: string;
+    args: string[];
+    description: string;
+    env?: Record<string, string>;
+  } = {
     command: 'node',
     args: [join(getPackageRoot(), 'dist', 'mcp.js')],
     description: 'starlog: capability manifest search -- library recommendations and library-vs-custom analysis for AI coding agents',
   };
+  // The MCP server is spawned by the agent and does NOT inherit the user's
+  // shell environment, so a shell `export` never reaches it. Bake the hosted
+  // key into the server's own `env` block so the agent can use hosted ranking.
+  if (apiKey) entry.env = { STARLOG_API_KEY: apiKey };
+  return entry;
 }
 
-async function configureMcpServer(): Promise<{ changed: boolean }> {
+async function configureMcpServer(apiKey?: string): Promise<{ changed: boolean }> {
   const settings = await readSettingsJson();
   if (!settings.mcpServers || typeof settings.mcpServers !== 'object') {
     settings.mcpServers = {};
   }
   const servers = settings.mcpServers as Record<string, unknown>;
 
-  const desired = desiredMcpServer();
+  const desired = desiredMcpServer(apiKey);
 
   if (JSON.stringify(servers.starlog) === JSON.stringify(desired)) {
     return { changed: false };
@@ -540,11 +550,11 @@ async function cursorAction(projectDir: string): Promise<PlanAction> {
 }
 
 /** Action for the Claude Code MCP server entry in settings.json. */
-async function mcpServerAction(): Promise<PlanAction> {
+async function mcpServerAction(apiKey?: string): Promise<PlanAction> {
   const settings = await readSettingsJson();
   const servers = (settings.mcpServers ?? {}) as Record<string, unknown>;
   if (!('starlog' in servers)) return 'create';
-  return JSON.stringify(servers.starlog) === JSON.stringify(desiredMcpServer())
+  return JSON.stringify(servers.starlog) === JSON.stringify(desiredMcpServer(apiKey))
     ? 'unchanged'
     : 'update';
 }
@@ -572,6 +582,7 @@ async function hookAction(): Promise<PlanAction> {
 async function buildInstallPlan(
   opts: InitOpts,
   projectDir: string,
+  apiKey?: string,
 ): Promise<{ items: PlanItem[]; skipped: SkippedItem[] }> {
   const items: PlanItem[] = [];
   const skipped: SkippedItem[] = [];
@@ -579,8 +590,8 @@ async function buildInstallPlan(
   items.push({
     label: 'Claude Code · MCP server',
     path: tildify(SETTINGS_PATH),
-    action: await mcpServerAction(),
-    apply: configureMcpServer,
+    action: await mcpServerAction(apiKey),
+    apply: () => configureMcpServer(apiKey),
   });
   items.push({
     label: 'Claude Code · PostToolUse hook',
@@ -653,10 +664,50 @@ interface InitOpts {
   all?: boolean;
   yes?: boolean;
   dryRun?: boolean;
+  apiKey?: string;
+}
+
+/**
+ * True when this package was run from npm's npx cache (~/.npm/_npx/<hash>/...).
+ * That directory is temporary -- npm garbage-collects it -- so an MCP server or
+ * hook pinned to a path inside it will silently stop working once the cache is
+ * cleared. We warn and steer the user to a durable global install.
+ */
+function isEphemeralInstall(): boolean {
+  return /[/\\]_npx[/\\]/.test(getPackageRoot());
+}
+
+/** Post-install guidance: what's active, what to do next, and any caveats. */
+function printPostInstallSummary(apiKey?: string): void {
+  console.log('\nDone! Next steps:');
+  console.log('  1. Restart your AI coding agent so it loads the MCP server.');
+  console.log('  2. Run `starlog doctor` to confirm everything is wired up.');
+
+  const ranking = apiKey
+    ? 'hosted semantic via STARLOG_API_KEY (wired into the MCP server) — experimental'
+    : 'keyword — offline, no key (the default)';
+  console.log(`\nRanking mode: ${ranking}.`);
+  if (!apiKey) {
+    console.log('  Keyword needs no setup. For experimental semantic ranking, re-run with');
+    console.log('  `--api-key <key>` (get one at https://api.starlog.dev/auth/github).');
+  }
+
+  console.log('\nThe `starlog_search` tool runs in Claude Code; Cursor, Copilot, and Codex');
+  console.log('get instruction files. The `starlog` CLI works in any terminal.');
+
+  if (isEphemeralInstall()) {
+    console.log('\n⚠  Heads up: this ran from a temporary npx cache, so the configured paths');
+    console.log('   will break when npm clears that cache. For a durable setup, install');
+    console.log('   globally and re-run:');
+    console.log('     npm install -g starloghq && starlog init');
+  }
 }
 
 export async function runInit(opts: InitOpts): Promise<void> {
   const projectDir = process.cwd();
+  // An explicit --api-key wins; otherwise pick up an exported STARLOG_API_KEY so
+  // `STARLOG_API_KEY=... starlog init` also wires the agent.
+  const apiKey = opts.apiKey ?? process.env.STARLOG_API_KEY;
 
   if (opts.uninstall) {
     console.log('Starlog — removing integrations...\n');
@@ -686,7 +737,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
     return;
   }
 
-  const { items, skipped } = await buildInstallPlan(opts, projectDir);
+  const { items, skipped } = await buildInstallPlan(opts, projectDir, apiKey);
   const changes = items.filter((i) => i.action !== 'unchanged');
 
   // ── Preview ──
@@ -706,6 +757,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
 
   if (changes.length === 0) {
     console.log('\nEverything is already configured. No changes needed.');
+    printPostInstallSummary(apiKey);
     return;
   }
 
@@ -740,5 +792,5 @@ export async function runInit(opts: InitOpts): Promise<void> {
     await item.apply();
     console.log(`  [done] ${item.label}`);
   }
-  console.log('\nDone! Restart your AI coding agent for changes to take effect.');
+  printPostInstallSummary(apiKey);
 }

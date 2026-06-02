@@ -131,7 +131,8 @@ program
   .option('--dry-run', 'Preview the changes without writing anything')
   .option('-y, --yes', 'Apply changes without the confirmation prompt (for CI/non-interactive use)')
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
-  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean }) => {
+  .option('--api-key <key>', 'Wire a hosted STARLOG_API_KEY into the MCP server (enables experimental hosted ranking for your agent)')
+  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string }) => {
     await runInit(opts);
 
     const agents = detectAgents();
