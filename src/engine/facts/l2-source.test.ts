@@ -93,3 +93,47 @@ describe('overlaySource — union known_vulns by id (private may add, never supp
     });
   });
 });
+
+// Generalizes the per-fixture cases above into an invariant over EVERY base×priv
+// combination, so any future change to overlaySource that reintroduces suppression
+// (or downgrade, or duplication) fails the build — the mechanical form of SEAM-3's
+// "never hide an honest library" floor. Dependency-free (no fast-check): exhaustive
+// power-set of a small id universe, base tags 'critical', priv tries to downgrade.
+describe('overlaySource — never-shrink invariant over every base×priv combination', () => {
+  const UNIVERSE: readonly string[] = ['CVE-A', 'CVE-B', 'INCIDENT:C'];
+  const powerset = <T,>(xs: readonly T[]): T[][] =>
+    xs.reduce<T[][]>((acc, x) => acc.concat(acc.map((s) => [...s, x])), [[]]);
+  const subsets = powerset(UNIVERSE);
+  // base tags every vuln 'critical' (license MIT / active); priv tags the SAME ids
+  // 'low' and asserts an org ruling (AGPL / deprecated) so base-wins + scalar
+  // private-wins are both observable.
+  const mk = (ids: readonly string[], priv: boolean) =>
+    handAuthoredL2Source({
+      pkg: overlay({
+        package: 'pkg',
+        known_vulns: ids.map((id) => vuln(id, priv ? 'low' : 'critical')),
+        license: priv ? 'AGPL-3.0' : 'MIT',
+        maintenance: priv ? 'deprecated' : 'active',
+      }),
+    });
+
+  it('every base id survives, keeps its severity, no dups, ids = base ∪ priv, scalar private-wins', () => {
+    const violations: string[] = [];
+    for (const baseIds of subsets) {
+      for (const privIds of subsets) {
+        const merged = overlaySource(mk(baseIds, false), mk(privIds, true)).lookup('pkg')!;
+        const ids = merged.known_vulns.map((v) => v.id);
+        const label = `base={${baseIds.join(',') || '∅'}} priv={${privIds.join(',') || '∅'}}`;
+        for (const id of baseIds) if (!ids.includes(id)) violations.push(`${label}: dropped base id ${id} (shrink)`);
+        for (const v of merged.known_vulns)
+          if (baseIds.includes(v.id) && v.severity !== 'critical') violations.push(`${label}: base id ${v.id} downgraded to ${v.severity}`);
+        if (new Set(ids).size !== ids.length) violations.push(`${label}: duplicate ids [${ids.join(',')}]`);
+        const expected = new Set([...baseIds, ...privIds]);
+        if (expected.size !== new Set(ids).size || ![...expected].every((x) => ids.includes(x)))
+          violations.push(`${label}: union mismatch, got [${ids.join(',')}]`);
+        if (merged.license !== 'AGPL-3.0' || merged.maintenance !== 'deprecated') violations.push(`${label}: scalar private-wins failed`);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+});
