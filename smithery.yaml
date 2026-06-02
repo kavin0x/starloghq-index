@@ -1,0 +1,20 @@
+# Smithery listing config for Starlog — a local, stdio MCP server.
+# https://smithery.ai/docs
+startCommand:
+  type: stdio
+  # No required configuration: Starlog runs fully locally with no account or key.
+  # STARLOG_API_KEY is optional and only enables experimental hosted ranking.
+  configSchema:
+    type: object
+    properties:
+      starlogApiKey:
+        type: string
+        title: STARLOG_API_KEY
+        description: Optional. Enables experimental hosted ranking; omit to run fully locally.
+    required: []
+  commandFunction: |
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'starloghq', 'mcp'],
+      env: config.starlogApiKey ? { STARLOG_API_KEY: config.starlogApiKey } : {}
+    })

@@ -5,6 +5,7 @@ import { KnownCategorySchema } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
+import { startMcpServer } from './mcp.js';
 import { getPackageVersion } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
@@ -158,6 +159,17 @@ program
     const code = await runDoctor();
     await track('cli_doctor', { ok: code === 0, code }, { noTelemetry: noTelemetry() });
     process.exit(code);
+  }));
+
+program
+  .command('mcp')
+  .description('Start the Starlog MCP server on stdio (for npx-launched registry clients)')
+  .action(action('mcp server failed to start', async () => {
+    // stdio transport owns stdout for the JSON-RPC protocol — emit nothing here.
+    // This is the npx-launchable entry point (`npx -y starloghq mcp`) that MCP
+    // registries and clients use; `dist/mcp.js`'s run-if-main guard remains for
+    // the absolute-path invocation that `init` wires into settings.json.
+    await startMcpServer();
   }));
 
 program

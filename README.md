@@ -7,6 +7,13 @@
 <p align="center"><strong>Better library decisions for your AI coding agent — free, local, no account.</strong></p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/starloghq"><img src="https://img.shields.io/npm/v/starloghq?color=cb3837&logo=npm" alt="npm version"></a>
+  <a href="https://github.com/starloghq/index/actions/workflows/ci.yml"><img src="https://github.com/starloghq/index/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-BUSL--1.1-blue" alt="License: BUSL-1.1"></a>
+  <img src="https://img.shields.io/badge/MCP-server-6E40C9" alt="MCP server">
+</p>
+
+<p align="center">
   <img src="demo/starlog-demo.gif" alt="Starlog returning ranked library recommendations in the terminal, then wiring itself into Claude Code, Cursor, Copilot and Codex with one command" width="820">
 </p>
 
@@ -91,20 +98,20 @@ npx tsx src/cli.ts init
 
 ### Manual MCP setup
 
-`starlog init` writes this for you with an absolute path resolved automatically. To configure by hand, add to `~/.claude/settings.json`:
+`starlog init` writes this for you automatically. To configure by hand, add to `~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "starlog": {
-      "command": "node",
-      "args": ["/path/to/starloghq/dist/mcp.js"]
+      "command": "npx",
+      "args": ["-y", "starloghq", "mcp"]
     }
   }
 }
 ```
 
-Replace `/path/to/starloghq` with the install location (`$(npm root -g)/starloghq` for a global install, or your clone directory from source). The server exposes one tool — `starlog_search` — accepting a natural-language query with optional `category`, `stack`, and `top_k` filters.
+This is the same launch command MCP registries use. (From a local source clone instead, point `node` at `dist/mcp.js` — `$(npm root -g)/starloghq/dist/mcp.js` for a global install, or your clone's path.) The server exposes one tool — `starlog_search` — accepting a natural-language query with optional `category`, `stack`, and `top_k` filters.
 
 ## CLI usage
 

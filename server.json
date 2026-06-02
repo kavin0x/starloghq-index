@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.starloghq/starlog",
+  "description": "Better library decisions for your AI coding agent — a local capability index of what libraries actually do (what each solves, which stacks it fits, when to skip one). Free, local, no account.",
+  "version": "0.1.8",
+  "repository": {
+    "url": "https://github.com/starloghq/index",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "starloghq",
+      "version": "0.1.8",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "STARLOG_API_KEY",
+          "description": "Optional. Enables experimental hosted ranking; the server runs fully locally without it.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
