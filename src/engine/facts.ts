@@ -18,6 +18,7 @@ export * from '@starloghq/facts-schema';
 
 export * from './facts/l2-source.js';
 export * from './facts/compose.js';
+export * from './facts/api-client.js';
 export * from './facts/service.js';
 export { formatFactView } from './facts/format.js';
 export { L1_FACTS, L1_BY_PACKAGE } from './facts/l1-data.js';

@@ -6,7 +6,7 @@ import { z } from 'zod/v4';
 import { KnownCategorySchema } from './manifest/schema.js';
 import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
-import { buildComposeDeps, lookupFactView, formatFactView } from './engine/facts.js';
+import { buildComposeDeps, resolveFactView, createFactsApiClient, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 
 // ── Result formatting ───────────────────────────────────────────────────────
@@ -90,11 +90,13 @@ export function createServer(): McpServer {
     },
   );
 
-  // Build the layered serve-time deps ONCE at server start: public L1+L2,
-  // overlaid with private L1+L2 (STARLOG_PRIVATE_FACTS) and an org policy
-  // (STARLOG_POLICY). The handler closes over these. Synchronous by design —
-  // createServer() must stay synchronous (the in-memory MCP test calls it directly).
-  const factsDeps = buildComposeDeps();
+  // Build serve-time deps ONCE at server start. Local: public L1+L2 overlaid
+  // with private L1+L2 (STARLOG_PRIVATE_FACTS) + org policy (STARLOG_POLICY).
+  // API: the hosted facts client when STARLOG_API_KEY is set (org-private L2 +
+  // policy come from the API, authoritative; local is the offline fallback).
+  // createServer() stays synchronous; the per-call lookup is async.
+  const factsLocal = buildComposeDeps();
+  const factsApi = createFactsApiClient();
 
   server.tool(
     'starlog_facts',
@@ -107,7 +109,7 @@ export function createServer(): McpServer {
         .describe('Optional project context for relevance, e.g. "Next.js SaaS, needs SSO"'),
     },
     async (args) => {
-      const view = lookupFactView(args.package, factsDeps);
+      const view = await resolveFactView(args.package, { local: factsLocal, api: factsApi });
       return { content: [{ type: 'text' as const, text: formatFactView(args.package, view) }] };
     },
   );

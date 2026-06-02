@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { L1CapabilityFactSchema, type L1CapabilityFact } from '@starloghq/facts-schema';
 import { type L2Overlay } from '@starloghq/facts-schema';
 import { handAuthoredL2Source, overlaySource, parseOverlay, type L2Source } from './l2-source.js';
-import { L3PolicySchema, type L3Policy } from '@starloghq/facts-schema';
+import { L3PolicySchema, evaluatePolicy, type L3Policy } from '@starloghq/facts-schema';
 import { composeFact, type ComposeDeps, type FactView } from './compose.js';
+import type { FactsApiClient } from './api-client.js';
 import { L1_BY_PACKAGE } from './l1-data.js';
 import { L2_BY_PACKAGE, L2_OVERLAYS_LIST } from './l2-data.js';
 
@@ -110,9 +111,49 @@ export function buildComposeDeps(env: NodeJS.ProcessEnv = process.env): ServiceD
   return { l1Lookup: (p) => mergedL1[p] ?? null, l2Source, policy, resolverKeys };
 }
 
-/** Resolve a free-text query to a composed FactView, or null on a miss. */
+/** Resolve a free-text query to a composed FactView (LOCAL-only, sync), or null. */
 export function lookupFactView(query: string, deps: ServiceDeps): FactView | null {
   const pkg = resolvePackage(query, deps.resolverKeys);
   if (!pkg) return null;
   return composeFact(pkg, deps);
+}
+
+export interface ServeDeps {
+  local: ServiceDeps;
+  api: FactsApiClient | null;
+}
+
+/**
+ * Resolve a package to a composed FactView, API-FIRST with local fallback —
+ * the path the MCP server and CLI use. Per layer the API value WINS (it's
+ * authoritative: the server resolves L2 public⊕private and supplies the org
+ * policy); local fills any gap and is the FULL offline fallback on API
+ * error/miss. evaluatePolicy runs HERE (client-side) per the contract.
+ *
+ * The package argument is passed to the API verbatim (the org may have private
+ * packages not in the local corpus); local resolution (fuzzy) is used only for
+ * the local-fallback parts.
+ */
+export async function resolveFactView(packageArg: string, deps: ServeDeps): Promise<FactView | null> {
+  const { local, api } = deps;
+  if (api) {
+    const res = await api.getFacts(packageArg);
+    if (res && res.found) {
+      const localPkg = resolvePackage(packageArg, local.resolverKeys);
+      const l1 = res.l1 ?? (localPkg ? local.l1Lookup(localPkg) : null);
+      const l2 = res.l2 ?? (localPkg ? local.l2Source.lookup(localPkg) : null);
+      if (l1 || l2) {
+        const l3 = evaluatePolicy(res.l3 ?? local.policy, { l1, l2 });
+        return {
+          package: res.l1?.package ?? res.l2?.package ?? packageArg,
+          ecosystem: l1?.ecosystem ?? l2?.ecosystem ?? 'npm',
+          l1,
+          l2,
+          l3,
+        };
+      }
+    }
+    // res null (network/non-OK error) or found:false → fall through to local.
+  }
+  return lookupFactView(packageArg, local);
 }

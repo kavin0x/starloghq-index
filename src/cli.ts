@@ -6,7 +6,16 @@ import { runSearch } from './search-service.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
 import { startMcpServer } from './mcp.js';
-import { buildComposeDeps, lookupFactView, formatFactView } from './engine/facts.js';
+import {
+  buildComposeDeps,
+  resolveFactView,
+  createFactsApiClient,
+  formatFactView,
+  L2OverlaySchema,
+  L3PolicySchema,
+  type L2Overlay,
+} from './engine/facts.js';
+import { readFileSync } from 'node:fs';
 import { getPackageVersion } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
@@ -173,10 +182,14 @@ program
     await startMcpServer();
   }));
 
-program
+const facts = program
   .command('facts')
-  .description('Look up authoritative facts (CVEs, license, maintenance) for a package')
-  .argument('<package>', 'Package name to look up (e.g., "ua-parser-js")')
+  .description("Look up package facts, or push your org's facts to the hosted API");
+
+// `starlog facts <package>` keeps working via this default subcommand.
+facts
+  .command('lookup <package>', { isDefault: true })
+  .description('Look up authoritative facts (CVEs, license, maintenance, capability) for a package')
   .option('--format <type>', 'Output format: json or table', 'table')
   .action(action('facts lookup failed', async (pkg: string, opts: { format: string }) => {
     if (opts.format !== 'json' && opts.format !== 'table') {
@@ -184,10 +197,12 @@ program
       process.exit(1);
     }
 
-    // Same layered serve path as the MCP server: public L1+L2, overlaid with
-    // private L1+L2 (STARLOG_PRIVATE_FACTS) and an org policy (STARLOG_POLICY).
-    const deps = buildComposeDeps();
-    const view = lookupFactView(pkg, deps);
+    // Same API-first serve path as the MCP server: hosted facts (org-private L2
+    // + policy) when STARLOG_API_KEY is set, with the local layered corpus
+    // (public L1+L2 + STARLOG_PRIVATE_FACTS/STARLOG_POLICY) as the offline fallback.
+    const local = buildComposeDeps();
+    const api = createFactsApiClient();
+    const view = await resolveFactView(pkg, { local, api });
 
     await track(
       'cli_facts',
@@ -196,6 +211,7 @@ program
         format: opts.format,
         private_overlay: !!process.env.STARLOG_PRIVATE_FACTS,
         policy: !!process.env.STARLOG_POLICY,
+        api: !!api,
       },
       { noTelemetry: noTelemetry() },
     );
@@ -206,6 +222,60 @@ program
       console.log(formatFactView(pkg, view));
     }
     // A miss is an honest answer, not an error — exit 0 either way.
+  }));
+
+// `starlog facts push [file]` — upload the org's private L2 overlays (+ optional
+// L3 policy) to the hosted facts API. File shape: { "l2": [L2Overlay...], "policy": L3Policy? }.
+facts
+  .command('push [file]')
+  .description("Push your org's private L2 overlays (+ optional L3 policy) to the hosted facts API (needs STARLOG_API_KEY)")
+  .action(action('facts push failed', async (file: string | undefined) => {
+    const api = createFactsApiClient();
+    if (!api) {
+      console.error('facts push needs STARLOG_API_KEY (the org key these facts belong to).');
+      process.exit(1);
+    }
+    const path = file ?? '.starlog/facts.json';
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(path, 'utf-8'));
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      const msg = e.code === 'ENOENT' ? `no facts file at ${path}` : `cannot read ${path}: ${e.message}`;
+      console.error(`facts push: ${msg}`);
+      process.exit(1);
+    }
+    const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+
+    const overlays: L2Overlay[] = [];
+    for (const entry of Array.isArray(obj.l2) ? obj.l2 : []) {
+      const r = L2OverlaySchema.safeParse(entry);
+      if (r.success) overlays.push(r.data);
+      else console.error('facts push: skipping an invalid L2 overlay (failed schema validation).');
+    }
+
+    let pushedPolicy = false;
+    if (obj.policy !== undefined) {
+      const p = L3PolicySchema.safeParse(obj.policy);
+      if (!p.success) {
+        console.error('facts push: policy failed schema validation; not pushed.');
+      } else {
+        const res = await api.pushPolicy(p.data);
+        if (!res.ok) {
+          console.error(`facts push: policy push failed (${res.error}).`);
+          process.exit(1);
+        }
+        pushedPolicy = true;
+      }
+    }
+
+    const res = await api.pushL2(overlays);
+    if (!res.ok) {
+      console.error(`facts push: L2 push failed (${res.error}).`);
+      process.exit(1);
+    }
+    await track('cli_facts_push', { l2_count: overlays.length, policy: pushedPolicy }, { noTelemetry: noTelemetry() });
+    console.log(`Pushed ${res.count ?? overlays.length} L2 overlay(s)${pushedPolicy ? ' + org policy' : ''} to the hosted facts API.`);
   }));
 
 program

@@ -67,13 +67,16 @@ Producers must EMIT the schemas, or the client can't read them:
 |---|---|---|
 | public L1 | `composeFact` `l1Lookup` dep | local stand-in shipped |
 | public L2 | base `L2Source` (`l2-source.ts`) | local stand-in shipped |
-| org-private L2 | `overlaySource(base, priv)` | **local file** today (`STARLOG_PRIVATE_FACTS`); needs an **API-backed `L2Source`** |
-| org L3 policy | `ComposeDeps.policy` | **local file** today (`STARLOG_POLICY`); needs an **API policy fetch** |
+| org-private L2 | `overlaySource(base, priv)` + the API-first `resolveFactView` | **built** — `FactsApiClient.getFacts` (`api-client.ts`); API L2 wins, local is the offline fallback |
+| org L3 policy | `ComposeDeps.policy` (from API envelope `.l3`) | **built** — `resolveFactView` runs `evaluatePolicy` on the API-supplied policy |
 
-**Client work to consume the hosted backend (additive — seams are ready):**
-`apiOrgL2Source` (an `L2Source` over `GET /facts`), an API policy fetch, the
-`parseFactsApiResponse` envelope reader, a `starlog facts push` command, and the
-facts API-key config. None require a refactor — they drop into existing seams.
+**Client consumption — BUILT** (`src/engine/facts/api-client.ts` + `service.resolveFactView`):
+- `createFactsApiClient()` — Bearer `STARLOG_API_KEY`, base `STARLOG_API_URL` (default `api.starlog.dev`), 10s abort; `null` when no key (→ local-only).
+- `getFacts(pkg)` → `GET /facts`, read with `parseFactsApiResponse` (defensive `.l1/.l2/.l3`); `null` on any non-OK/network error.
+- `resolveFactView(pkg, { local, api })` — **API-first, per-layer API-wins, full local fallback**; `evaluatePolicy` runs client-side. Used by the MCP tool + `starlog facts lookup`.
+- `starlog facts push [file]` — `pushL2` (`POST /facts/l2`, batch `{overlays}`) + `pushPolicy` (`POST /facts/policy`); file shape `{ l2: L2Overlay[], policy?: L3Policy }`.
+
+**Still backend-side (not the client's to build):** the `GET/POST /facts*` endpoints, org identity + `org_id`-from-key isolation, KV/D1 storage — see `docs/alignment/sy5-correction-DRAFT.md`.
 
 ## Versioning rule
 
