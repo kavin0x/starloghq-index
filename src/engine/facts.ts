@@ -1,92 +1,36 @@
 /**
- * Transport-agnostic facts engine for `starlog_facts`.
+ * Public facts API — the LAYERED model.
  *
- * Returns a `FactRecord | null` (NOT a serialized string — formatting is the
- * transport's job). The MCP server (src/mcp.ts) and the CLI both consume facts
- * from here. Ported from the validated facts capability in the starlogdev R&D
- * repo; the public corpus + schema live in co-located ./facts-data and
- * ./facts-types so nothing here depends on the benchmark harness.
+ * Three independent layers, composed at query time, never collapsed:
+ *   L1 (immutable capability)  ./facts/l1-capability + l1-data
+ *   L2 (mutable overlay)       ./facts/l2-overlay + l2-source + l2-data
+ *   L3 (org policy)            ./facts/l3-policy
+ *   composition                ./facts/compose + service + format
+ *
+ * Private inputs are independent: STARLOG_PRIVATE_FACTS feeds private L1+L2,
+ * STARLOG_POLICY feeds L3 — wired in service.buildComposeDeps().
  */
 
-export {
-  FactRecordSchema,
-  VulnSchema,
-  type FactRecord,
-  type Vuln,
-} from './facts-types.js';
+export * from './facts/l1-capability.js';
+export * from './facts/l2-overlay.js';
+export * from './facts/l2-source.js';
+export * from './facts/l3-policy.js';
+export * from './facts/compose.js';
+export * from './facts/service.js';
+export { formatFactView } from './facts/format.js';
+export { L1_FACTS, L1_BY_PACKAGE } from './facts/l1-data.js';
+export { L2_OVERLAYS_LIST, L2_BY_PACKAGE } from './facts/l2-data.js';
 
-export { FACT_STUBS, VERIFIED_FACTS } from './facts-data.js';
-
-import { readFileSync } from 'node:fs';
-import { VERIFIED_FACTS } from './facts-data.js';
-import { FactRecordSchema, type FactRecord } from './facts-types.js';
+import { buildComposeDeps, lookupFactView } from './facts/service.js';
+import type { FactView } from './facts/compose.js';
 
 /**
- * Fuzzy-match a query against a fact map and return the matching record, or
- * null on a miss. Lowercase + trim; match on exact OR query.includes(pkg) OR
- * pkg.includes(query).
- *
- * @param query   the package name (or a phrase containing it) to look up
- * @param factMap defaults to VERIFIED_FACTS (verified:true records only)
+ * Convenience resolver used by the CLI's per-call path and the eval harness:
+ * resolve a free-text query to a composed FactView (or null), using deps derived
+ * from the current environment. For the MCP server (and any hot path) build deps
+ * ONCE via buildComposeDeps() and call lookupFactView() to avoid re-reading env
+ * files per call.
  */
-export function lookupFacts(
-  query: string,
-  factMap: Record<string, FactRecord> = VERIFIED_FACTS,
-): FactRecord | null {
-  const q = query.toLowerCase().trim();
-  if (!q) return null;
-  for (const [pkg, rec] of Object.entries(factMap)) {
-    // Normalize the key symmetrically with the query (lowercase + trim). Skip an
-    // empty/whitespace-only key: with p === '', `q.includes(p)` is always true,
-    // so it would match EVERY query (reachable via a malformed private overlay).
-    const p = pkg.toLowerCase().trim();
-    if (!p) continue;
-    if (q === p || q.includes(p) || p.includes(q)) return rec;
-  }
-  return null;
-}
-
-/**
- * Build the fact map served by `starlog_facts`, optionally overlaying an
- * ORG-PRIVATE facts file on top of the public corpus.
- *
- * Resilience contract (two levels):
- *   - FILE-LEVEL: a missing / unreadable / invalid-JSON private file is a soft
- *     failure — warn to stderr and return the FULL public map (never throw).
- *   - ENTRY-LEVEL: an entry that fails `FactRecordSchema` OR is `verified:false`
- *     is skipped; the remaining valid+verified entries still load.
- *
- * Merge semantics: `{ ...public, ...private }` — on key (package) collision the
- * PRIVATE entry WINS. With `privatePath` falsy the function is the identity on
- * the public corpus (unset env → byte-identical public-only behavior).
- *
- * Synchronous on purpose: `createServer()` loads this once at server start and
- * must stay synchronous (it is called directly in the in-memory MCP test).
- *
- * @param privatePath absolute path to a JSON array of FactRecord objects, or
- *                    undefined to serve the public corpus only.
- */
-export function loadFactMap(privatePath?: string): Record<string, FactRecord> {
-  if (!privatePath) return VERIFIED_FACTS;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(readFileSync(privatePath, 'utf-8'));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[starlog] private facts file unreadable (${privatePath}): ${msg}; using public facts only.`,
-    );
-    return VERIFIED_FACTS;
-  }
-
-  const entries = Array.isArray(parsed) ? parsed : [];
-  const privateMap: Record<string, FactRecord> = {};
-  for (const entry of entries) {
-    const result = FactRecordSchema.safeParse(entry);
-    if (!result.success || result.data.verified !== true) continue;
-    privateMap[result.data.package] = result.data;
-  }
-
-  return { ...VERIFIED_FACTS, ...privateMap };
+export function lookupFacts(query: string): FactView | null {
+  return lookupFactView(query, buildComposeDeps());
 }

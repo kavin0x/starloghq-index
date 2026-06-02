@@ -6,7 +6,7 @@ import { z } from 'zod/v4';
 import { KnownCategorySchema } from './manifest/schema.js';
 import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
-import { lookupFacts, loadFactMap, type FactRecord } from './engine/facts.js';
+import { buildComposeDeps, lookupFactView, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 
 // ── Result formatting ───────────────────────────────────────────────────────
@@ -65,39 +65,8 @@ function formatResults(query: string, results: QueryResult[]): string {
 export const FACTS_TOOL_DESCRIPTION =
   'Look up authoritative facts about a software package: known vulnerabilities/CVEs and supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and what the package can do (effect surface). Use it to vet a package before recommending it.';
 
-/**
- * Render a FactRecord (or a miss) as markdown for the starlog_facts tool.
- * Mirrors the markdown style of formatResults (## heading, **bold** labels).
- * A miss is an honest, first-class answer — "no facts on file" — mirroring
- * search's "no strong match" rather than fabricating coverage.
- */
-export function formatFacts(pkg: string, rec: FactRecord | null): string {
-  if (!rec) {
-    return `No facts on file for "${pkg}". Starlog has no verified vulnerability, license, or maintenance record for this package.`;
-  }
-
-  const lines: string[] = [];
-  lines.push(`## ${rec.package} (${rec.ecosystem})`);
-  lines.push(`**Maintenance:** ${rec.maintenance}`);
-  lines.push(`**License:** ${rec.license} (risk: ${rec.license_risk})`);
-  lines.push(`**Effect surface:** ${rec.effect_surface}`);
-  if (rec.known_vulns.length > 0) {
-    lines.push(`**Known vulnerabilities / incidents:**`);
-    for (const v of rec.known_vulns) {
-      lines.push(`  - ${v.id} [${v.severity}] affected: ${v.affected} — ${v.summary}`);
-    }
-  } else {
-    lines.push(`**Known vulnerabilities / incidents:** No known vulnerabilities/incidents on file.`);
-  }
-  if (rec.transitive_risk) {
-    lines.push(`**Transitive risk:** ${rec.transitive_risk}`);
-  }
-  lines.push(`**Source:** ${rec.source}`);
-  // Recency is load-bearing for correctness: a "no known vulns" record can go
-  // stale. Surface when it was last confirmed so the reader can weigh it.
-  lines.push(`**Verified:** as of ${rec.last_verified}`);
-  return lines.join('\n');
-}
+// Rendering of a composed FactView lives in engine/facts/format.ts
+// (formatFactView) — shared by the MCP tool and the CLI.
 
 // ── Server ──────────────────────────────────────────────────────────────────
 
@@ -121,12 +90,11 @@ export function createServer(): McpServer {
     },
   );
 
-  // Load the facts map ONCE at server start. With STARLOG_PRIVATE_FACTS unset
-  // this is the public corpus; when set, an org-private overlay is merged in
-  // (private wins on key collision). The handler below closes over this map.
-  // Synchronous by design — createServer() must stay synchronous (the in-memory
-  // MCP test calls it directly).
-  const factMap = loadFactMap(process.env.STARLOG_PRIVATE_FACTS);
+  // Build the layered serve-time deps ONCE at server start: public L1+L2,
+  // overlaid with private L1+L2 (STARLOG_PRIVATE_FACTS) and an org policy
+  // (STARLOG_POLICY). The handler closes over these. Synchronous by design —
+  // createServer() must stay synchronous (the in-memory MCP test calls it directly).
+  const factsDeps = buildComposeDeps();
 
   server.tool(
     'starlog_facts',
@@ -139,8 +107,8 @@ export function createServer(): McpServer {
         .describe('Optional project context for relevance, e.g. "Next.js SaaS, needs SSO"'),
     },
     async (args) => {
-      const rec = lookupFacts(args.package, factMap);
-      return { content: [{ type: 'text' as const, text: formatFacts(args.package, rec) }] };
+      const view = lookupFactView(args.package, factsDeps);
+      return { content: [{ type: 'text' as const, text: formatFactView(args.package, view) }] };
     },
   );
 

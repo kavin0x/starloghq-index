@@ -5,8 +5,8 @@ import { KnownCategorySchema } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
-import { startMcpServer, formatFacts } from './mcp.js';
-import { lookupFacts, loadFactMap } from './engine/facts.js';
+import { startMcpServer } from './mcp.js';
+import { buildComposeDeps, lookupFactView, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
@@ -184,21 +184,26 @@ program
       process.exit(1);
     }
 
-    // Same map the MCP server serves: public corpus, plus an org-private overlay
-    // when STARLOG_PRIVATE_FACTS points at a JSON file.
-    const factMap = loadFactMap(process.env.STARLOG_PRIVATE_FACTS);
-    const rec = lookupFacts(pkg, factMap);
+    // Same layered serve path as the MCP server: public L1+L2, overlaid with
+    // private L1+L2 (STARLOG_PRIVATE_FACTS) and an org policy (STARLOG_POLICY).
+    const deps = buildComposeDeps();
+    const view = lookupFactView(pkg, deps);
 
     await track(
       'cli_facts',
-      { hit: rec !== null, format: opts.format, private_overlay: !!process.env.STARLOG_PRIVATE_FACTS },
+      {
+        hit: view !== null,
+        format: opts.format,
+        private_overlay: !!process.env.STARLOG_PRIVATE_FACTS,
+        policy: !!process.env.STARLOG_POLICY,
+      },
       { noTelemetry: noTelemetry() },
     );
 
     if (opts.format === 'json') {
-      console.log(JSON.stringify(rec, null, 2));
+      console.log(JSON.stringify(view, null, 2));
     } else {
-      console.log(formatFacts(pkg, rec));
+      console.log(formatFactView(pkg, view));
     }
     // A miss is an honest answer, not an error — exit 0 either way.
   }));

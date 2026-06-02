@@ -113,9 +113,12 @@ describe('starlog facts CLI (e2e, spawned binary)', () => {
     expect(parsed).not.toBeNull();
     expect(parsed.package).toBe('chalk');
     // chalk is the clean baseline control — no vulns, active, permissive.
-    expect(parsed.known_vulns).toEqual([]);
-    expect(parsed.maintenance).toBe('active');
-    expect(parsed.last_verified).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // Layered view: vuln/license/maintenance live under l2; recency is l2.attestation.fetched_at.
+    expect(parsed.l2.known_vulns).toEqual([]);
+    expect(parsed.l2.maintenance).toBe('active');
+    expect(parsed.l2.attestation.fetched_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(parsed.l1.effect_surface).toContain('Terminal string styling');
+    expect(parsed.l3.decision).toBe('none');
   });
 
   it('--format json on a miss emits the literal JSON null and exits 0', () => {
@@ -137,47 +140,31 @@ describe('starlog facts CLI (e2e, spawned binary)', () => {
   });
 
   describe('org-private overlay (STARLOG_PRIVATE_FACTS) end-to-end', () => {
-    // One brand-new package (no public entry) and one override of an existing
-    // public package (chalk). Both are valid + verified, both carry last_verified.
+    // Layered private overlay: independent l1 + l2 arrays. One brand-new package
+    // (private L1 + L2, no public entry) and one override of an existing public
+    // package (chalk) — overriding its L1 effect surface AND its L2 maintenance.
     const NEW_PKG = '@acme/internal-widget';
     const OVERRIDE_MARKER = 'ORG OVERRIDE: internal banned chalk fork';
 
     function overlayFile(): string {
-      return writePrivate([
-        {
-          package: NEW_PKG,
-          ecosystem: 'npm',
-          effect_surface: 'Internal widget; runs in-process.',
-          known_vulns: [
-            {
-              id: 'INCIDENT:acme-widget-internal',
-              severity: 'high',
-              affected: '< 2.0.0',
-              summary: 'Internal ruling: banned below 2.0.0.',
-            },
-          ],
-          license: 'UNLICENSED',
-          license_risk: 'unknown',
-          maintenance: 'deprecated',
-          transitive_risk: null,
-          source: 'ACME internal registry',
-          verified: true,
-          last_verified: '2026-05-15',
-        },
-        {
-          package: 'chalk',
-          ecosystem: 'npm',
-          effect_surface: OVERRIDE_MARKER,
-          known_vulns: [],
-          license: 'MIT',
-          license_risk: 'none',
-          maintenance: 'abandoned',
-          transitive_risk: null,
-          source: 'ACME security ruling',
-          verified: true,
-          last_verified: '2026-05-16',
-        },
-      ]);
+      return writePrivate({
+        l1: [
+          { package: NEW_PKG, ecosystem: 'npm', version_range: null, artifact_sha256: null, effect_surface: 'Internal widget; runs in-process.', capabilities: [], provenance: { derived_by: 'hand', source: 'ACME internal', verified: true } },
+          { package: 'chalk', ecosystem: 'npm', version_range: null, artifact_sha256: null, effect_surface: OVERRIDE_MARKER, capabilities: [], provenance: { derived_by: 'hand', source: 'ACME security ruling', verified: true } },
+        ],
+        l2: [
+          {
+            package: NEW_PKG, ecosystem: 'npm',
+            known_vulns: [{ id: 'INCIDENT:acme-widget-internal', severity: 'high', affected: '< 2.0.0', summary: 'Internal ruling: banned below 2.0.0.' }],
+            license: 'UNLICENSED', license_risk: 'unknown', maintenance: 'deprecated', transitive_risk: null,
+            attestation: { source: 'hand', refs: ['ACME internal registry'], fetched_at: '2026-05-15' },
+          },
+          {
+            package: 'chalk', ecosystem: 'npm', known_vulns: [], license: 'MIT', license_risk: 'none', maintenance: 'abandoned', transitive_risk: null,
+            attestation: { source: 'hand', refs: ['ACME security ruling'], fetched_at: '2026-05-16' },
+          },
+        ],
+      });
     }
 
     it('resolves a NEW private-only package through the spawned CLI', () => {
