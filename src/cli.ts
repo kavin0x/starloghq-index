@@ -5,7 +5,8 @@ import { KnownCategorySchema } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
-import { startMcpServer } from './mcp.js';
+import { startMcpServer, formatFacts } from './mcp.js';
+import { lookupFacts, loadFactMap } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
@@ -170,6 +171,36 @@ program
     // registries and clients use; `dist/mcp.js`'s run-if-main guard remains for
     // the absolute-path invocation that `init` wires into settings.json.
     await startMcpServer();
+  }));
+
+program
+  .command('facts')
+  .description('Look up authoritative facts (CVEs, license, maintenance) for a package')
+  .argument('<package>', 'Package name to look up (e.g., "ua-parser-js")')
+  .option('--format <type>', 'Output format: json or table', 'table')
+  .action(action('facts lookup failed', async (pkg: string, opts: { format: string }) => {
+    if (opts.format !== 'json' && opts.format !== 'table') {
+      console.error(`Invalid format: ${opts.format}. Use "json" or "table".`);
+      process.exit(1);
+    }
+
+    // Same map the MCP server serves: public corpus, plus an org-private overlay
+    // when STARLOG_PRIVATE_FACTS points at a JSON file.
+    const factMap = loadFactMap(process.env.STARLOG_PRIVATE_FACTS);
+    const rec = lookupFacts(pkg, factMap);
+
+    await track(
+      'cli_facts',
+      { hit: rec !== null, format: opts.format, private_overlay: !!process.env.STARLOG_PRIVATE_FACTS },
+      { noTelemetry: noTelemetry() },
+    );
+
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(rec, null, 2));
+    } else {
+      console.log(formatFacts(pkg, rec));
+    }
+    // A miss is an honest answer, not an error — exit 0 either way.
   }));
 
 program

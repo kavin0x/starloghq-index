@@ -92,6 +92,12 @@ starlog search "background jobs for node" --top-k 1 --format json 2>/dev/null \
   | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.exit(Array.isArray(a)&&a.length>0?0:1)})'
 check "search --format json emits valid non-empty JSON" $?
 
+starlog facts ua-parser-js 2>/dev/null | grep -qi "INCIDENT:ua-parser-js-2021"
+check "facts returns the verified incident record for a known package" $?
+
+starlog facts no-such-pkg-xyz 2>/dev/null | grep -qi "no facts on file"
+check "facts gives an honest miss for an unknown package" $?
+
 DOC_PRE="$(starlog doctor 2>&1)"; DOC_PRE_RC=$?
 { [ $DOC_PRE_RC -eq 0 ] && echo "$DOC_PRE" | grep -qi "not configured"; }
 check "doctor (pre-init) runs and reports unconfigured" $?

@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { KnownCategorySchema } from './manifest/schema.js';
 import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
+import { lookupFacts, loadFactMap, type FactRecord } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 
 // ── Result formatting ───────────────────────────────────────────────────────
@@ -52,6 +53,49 @@ function formatResults(query: string, results: QueryResult[]): string {
   return lines.join('\n');
 }
 
+// ── Facts tool ────────────────────────────────────────────────────────────
+
+/**
+ * VERBATIM willingness-benchmark tool description. This exact string earned the
+ * unprompted tool call (100% recall / 98% specificity on a neutral prompt,
+ * across 4 frontier models) in the validated facts experiment. It is
+ * load-bearing — the agent must reach for the tool on this description alone.
+ * Asserted character-for-character in src/mcp-facts.test.ts.
+ */
+export const FACTS_TOOL_DESCRIPTION =
+  'Look up authoritative facts about a software package: known vulnerabilities/CVEs and supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and what the package can do (effect surface). Use it to vet a package before recommending it.';
+
+/**
+ * Render a FactRecord (or a miss) as markdown for the starlog_facts tool.
+ * Mirrors the markdown style of formatResults (## heading, **bold** labels).
+ * A miss is an honest, first-class answer — "no facts on file" — mirroring
+ * search's "no strong match" rather than fabricating coverage.
+ */
+export function formatFacts(pkg: string, rec: FactRecord | null): string {
+  if (!rec) {
+    return `No facts on file for "${pkg}". Starlog has no verified vulnerability, license, or maintenance record for this package.`;
+  }
+
+  const lines: string[] = [];
+  lines.push(`## ${rec.package} (${rec.ecosystem})`);
+  lines.push(`**Maintenance:** ${rec.maintenance}`);
+  lines.push(`**License:** ${rec.license} (risk: ${rec.license_risk})`);
+  lines.push(`**Effect surface:** ${rec.effect_surface}`);
+  if (rec.known_vulns.length > 0) {
+    lines.push(`**Known vulnerabilities / incidents:**`);
+    for (const v of rec.known_vulns) {
+      lines.push(`  - ${v.id} [${v.severity}] affected: ${v.affected} — ${v.summary}`);
+    }
+  } else {
+    lines.push(`**Known vulnerabilities / incidents:** No known vulnerabilities/incidents on file.`);
+  }
+  if (rec.transitive_risk) {
+    lines.push(`**Transitive risk:** ${rec.transitive_risk}`);
+  }
+  lines.push(`**Source:** ${rec.source}`);
+  return lines.join('\n');
+}
+
 // ── Server ──────────────────────────────────────────────────────────────────
 
 export function createServer(): McpServer {
@@ -71,6 +115,29 @@ export function createServer(): McpServer {
     async (args) => {
       const results = await runSearch(args);
       return { content: [{ type: 'text' as const, text: formatResults(args.query, results) }] };
+    },
+  );
+
+  // Load the facts map ONCE at server start. With STARLOG_PRIVATE_FACTS unset
+  // this is the public corpus; when set, an org-private overlay is merged in
+  // (private wins on key collision). The handler below closes over this map.
+  // Synchronous by design — createServer() must stay synchronous (the in-memory
+  // MCP test calls it directly).
+  const factMap = loadFactMap(process.env.STARLOG_PRIVATE_FACTS);
+
+  server.tool(
+    'starlog_facts',
+    FACTS_TOOL_DESCRIPTION,
+    {
+      package: z.string().describe('The package name to look up, e.g. "ua-parser-js"'),
+      context: z
+        .string()
+        .optional()
+        .describe('Optional project context for relevance, e.g. "Next.js SaaS, needs SSO"'),
+    },
+    async (args) => {
+      const rec = lookupFacts(args.package, factMap);
+      return { content: [{ type: 'text' as const, text: formatFacts(args.package, rec) }] };
     },
   );
 

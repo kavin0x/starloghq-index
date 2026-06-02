@@ -52,8 +52,9 @@ Starlog is a local **capability index** for AI coding agents: a structured, quer
 ## What you get
 
 - **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets real, structured capability data (ranked by relevance) instead of training-data recall.
+- **`starlog_facts` MCP tool** — your agent looks up **authoritative facts about a specific package** before recommending it: known CVEs/supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and effect surface. In a 4-model benchmark, agents called this tool unprompted on package decisions (100% recall, 98% specificity) and it moved them toward the correct install/avoid/pick call. Every record is sourced and verified; a package with no record returns an honest "no facts on file." Point `STARLOG_PRIVATE_FACTS` at a JSON file to overlay your org's own private facts (internal blocklists, license policy) on top of the public corpus.
 - **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces that library's `skip_when` conditions and alternatives as context, so the agent can reconsider or swap before building on it. It's advisory — it informs the agent's next move, it doesn't block the install.
-- **`starlog search` CLI** — query the same index directly from your terminal.
+- **`starlog search` / `starlog facts` CLI** — query the same index and facts corpus directly from your terminal.
 - **Runs on your machine** — the engine and corpus are local; searches need no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)
 
 ## Quick start
@@ -111,7 +112,7 @@ npx tsx src/cli.ts init
 }
 ```
 
-This is the same launch command MCP registries use. (From a local source clone instead, point `node` at `dist/mcp.js` — `$(npm root -g)/starloghq/dist/mcp.js` for a global install, or your clone's path.) The server exposes one tool — `starlog_search` — accepting a natural-language query with optional `category`, `stack`, and `top_k` filters.
+This is the same launch command MCP registries use. (From a local source clone instead, point `node` at `dist/mcp.js` — `$(npm root -g)/starloghq/dist/mcp.js` for a global install, or your clone's path.) The server exposes two tools: `starlog_search` (a natural-language capability query with optional `category`, `stack`, and `top_k` filters) and `starlog_facts` (an authoritative per-package fact lookup — CVEs, license, maintenance).
 
 ## CLI usage
 
