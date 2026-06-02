@@ -14,9 +14,9 @@
 Our own contract rule (`docs/FACTS-CONTRACT.md`): *"if a shape changes, it changes in the
 package, once."* The Master Plan locks the authoritative L1/L2 record shapes. Where the
 package and the Plan disagree, the package is the one that must move — **additively where
-possible, with a coordinated major where structural.** `0.1.0` is **not yet published**, so
-the L1 additive subset is cheapest to land *before* first publish; the L2 model change is a
-later, backend-coordinated major.
+possible, with a coordinated major where structural.** (Per the spec-only decision, `0.1.0`
+publishes as-is *without* these changes; the L1 additive subset rides the next minor after
+ratification, the L2 model change a later backend-coordinated major.)
 
 ## L1 — capability facts (Master Plan `index-builder.html` §4.4 `L1FactRecord`)
 
@@ -72,7 +72,7 @@ item; no schema field beyond carrying `hash` as the key (covered under L1 above)
 
 1. **`facts-schema` minor (e.g. 0.2.0):** the safe-additive L1 subset (`analyzer_version`,
    `cdl_version`, `analysis_partial`; `artifact_sha256` documented as the key). Backward
-   compatible; lands cheaply before/with first publish.
+   compatible; lands in the first minor after ratification (`0.1.0` ships without it).
 2. **`facts-schema` major (coordinated with the index-builder build):** the L1
    `effect_surface` struct + `api_shape`/`dep_fanout`, and the **L2 overlay→`AttestationRecord`-set**
    redesign. Designed jointly with the backend; aligns the package, the served `GET /facts`
@@ -81,5 +81,5 @@ item; no schema field beyond carrying `hash` as the key (covered under L1 above)
 ## Net
 
 The package must become a literal mirror of `index-builder.html` §4.4 + §6.1, because both the
-client and the index-builder import it. The L1 pins are a free pre-publish win; the L2 set-model
+client and the index-builder import it. The L1 pins are a cheap additive first step; the L2 set-model
 is the real work and is the backend's to co-author. **Until ratified, change no package code.**
