@@ -29,14 +29,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Build BEFORE Test: the facts CLI e2e tests (src/facts-cli.e2e.test.ts)
+      # spawn the built dist/cli.js and assume dist/ is pre-built. Building after
+      # testing made them fail with exit -1 (ENOENT) on a clean CI checkout.
+      - name: Build
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Test
         run: npm test
-
-      - name: Build
-        run: npm run build
 
   smoke:
     runs-on: ubuntu-latest
