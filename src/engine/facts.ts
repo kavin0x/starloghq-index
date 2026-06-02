@@ -36,7 +36,11 @@ export function lookupFacts(
   const q = query.toLowerCase().trim();
   if (!q) return null;
   for (const [pkg, rec] of Object.entries(factMap)) {
-    const p = pkg.toLowerCase();
+    // Normalize the key symmetrically with the query (lowercase + trim). Skip an
+    // empty/whitespace-only key: with p === '', `q.includes(p)` is always true,
+    // so it would match EVERY query (reachable via a malformed private overlay).
+    const p = pkg.toLowerCase().trim();
+    if (!p) continue;
     if (q === p || q.includes(p) || p.includes(q)) return rec;
   }
   return null;

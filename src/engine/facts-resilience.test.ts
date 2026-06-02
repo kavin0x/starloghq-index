@@ -319,3 +319,30 @@ describe('VERIFIED_FACTS / FACT_STUBS — corpus invariants', () => {
     }
   });
 });
+
+describe('lookupFacts — key normalization & short-query precedence (regression)', () => {
+  it('normalizes the KEY symmetrically with the query (trailing whitespace key still matches)', () => {
+    // A private overlay could store a package name with stray whitespace; the
+    // query side is lowercased+trimmed, so the key must be too.
+    const map = { '  Left-Pad  ': { ...VERIFIED_FACTS['left-pad'], package: 'left-pad' } };
+    expect(lookupFacts('left-pad', map)?.package).toBe('left-pad');
+    expect(lookupFacts('LEFT-PAD', map)?.package).toBe('left-pad');
+  });
+
+  it('does NOT let an empty/whitespace-only key match every query', () => {
+    // With an un-skipped empty key, q.includes('') === true would match anything.
+    const map = {
+      '   ': { ...VERIFIED_FACTS['chalk'], package: 'blank-key' },
+      chalk: VERIFIED_FACTS['chalk'],
+    };
+    expect(lookupFacts('totally-unrelated-xyz', map)).toBeNull();
+    expect(lookupFacts('chalk', map)?.package).toBe('chalk');
+  });
+
+  it('resolves a short single-letter query against the REAL corpus deterministically by insertion order', () => {
+    // Pins which public fact a dangerously short query returns, so an insertion-
+    // order change in facts-data.ts that shifts it is caught.
+    const firstWithA = FACT_STUBS.find((f) => f.package.toLowerCase().includes('a'));
+    expect(lookupFacts('a')?.package).toBe(firstWithA?.package);
+  });
+});
