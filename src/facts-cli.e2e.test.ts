@@ -2,6 +2,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 /**
@@ -17,7 +18,10 @@ import { tmpdir } from 'node:os';
  * dist/ is assumed pre-built (the assignment guarantees it).
  */
 
-const REPO = '/Users/scandal/ai/starlog-index';
+// Repo root, derived from this file's location (src/ → ..) so the spawn cwd works
+// on any machine/CI — NOT a hardcoded absolute path (which only existed on the
+// original author's box and made every spawn ENOENT on Linux CI).
+const REPO = fileURLToPath(new URL('..', import.meta.url));
 const CLI = 'dist/cli.js';
 
 /** Result of running the CLI: captured stdout, stderr, and exit status. */
