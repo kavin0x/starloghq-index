@@ -27,15 +27,44 @@ export function handAuthoredL2Source(overlays: Record<string, L2Overlay>): L2Sou
 }
 
 /**
- * Merge a private overlay source over a base source (private wins). The org's
- * own L2 rulings (internal advisories, license calls) shadow the public ones.
- * Entry validation/skip lives in the loader that builds the private map.
+ * Merge a private overlay over a base overlay for the SAME package.
+ *
+ * Org rulings win on the scalar fields (license/maintenance calls are the org's
+ * to make), but `known_vulns` is UNIONED by id with the BASE winning on a
+ * collision: an upstream advisory's existence and severity are immutable here —
+ * a private overlay may only ADD net-new ids (e.g. `INCIDENT:<slug>`), never
+ * drop or downgrade an upstream one. (Whole-record private-wins used to silently
+ * suppress a real CVE.) Refining/overriding an upstream claim is a separate,
+ * additive concern — the curated-claim type (VEX status + `severity_for_us` +
+ * justification) — and lands with that schema, not by mutating `VulnSchema` here.
+ */
+function mergeOverlay(base: L2Overlay, priv: L2Overlay): L2Overlay {
+  const baseIds = new Set(base.known_vulns.map((v) => v.id));
+  return {
+    ...priv, // org rulings win on scalar fields
+    known_vulns: [
+      ...base.known_vulns, // upstream existence + severity is immutable...
+      ...priv.known_vulns.filter((v) => !baseIds.has(v.id)), // ...private may only add net-new ids
+    ],
+  };
+}
+
+/**
+ * Layer a private overlay source over a base source. The org's own L2 rulings
+ * (internal advisories, license calls) shadow the public ones per-field, but the
+ * union semantics in {@link mergeOverlay} guarantee a private overlay can never
+ * suppress an upstream vuln. Entry validation/skip lives in the loader that
+ * builds the private map.
  */
 export function overlaySource(base: L2Source, priv: L2Source | null): L2Source {
   if (!priv) return base;
   return {
     lookup(pkg, ecosystem) {
-      return priv.lookup(pkg, ecosystem) ?? base.lookup(pkg, ecosystem);
+      const p = priv.lookup(pkg, ecosystem);
+      const b = base.lookup(pkg, ecosystem);
+      if (!p) return b;
+      if (!b) return p;
+      return mergeOverlay(b, p);
     },
   };
 }

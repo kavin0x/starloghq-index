@@ -117,3 +117,44 @@ describe('buildComposeDeps + lookupFactView (public, no env)', () => {
     expect(lookupFactView('no-such-pkg', buildComposeDeps({}))).toBeNull();
   });
 });
+
+describe('private L2 overlay over a public package — must not suppress the upstream CVE', () => {
+  let dir: string | null = null;
+  afterEach(() => { if (dir) { rmSync(dir, { recursive: true, force: true }); dir = null; } });
+  const writePriv = (obj: unknown): string => {
+    dir = mkdtempSync(join(tmpdir(), 'starlog-overlay-'));
+    const p = join(dir, 'private.json');
+    writeFileSync(p, JSON.stringify(obj), 'utf-8');
+    return p;
+  };
+
+  // ua-parser-js ships an upstream critical advisory in the public corpus
+  // (INCIDENT:ua-parser-js-2021). An org overlay for the SAME package must
+  // layer its own rulings WITHOUT dropping or downgrading that advisory.
+  it('keeps the upstream critical vuln while applying the private org ruling and net-new advisory', () => {
+    const path = writePriv({
+      l2: [{
+        package: 'ua-parser-js',
+        ecosystem: 'npm',
+        // org tries to downgrade the upstream incident + adds its own advisory
+        known_vulns: [
+          { id: 'INCIDENT:ua-parser-js-2021', severity: 'low', affected: '*', summary: 'we pin away from it' },
+          { id: 'INCIDENT:acme-sbom-flag', severity: 'medium', affected: '*', summary: 'flagged by acme SBOM gate' },
+        ],
+        license: 'MIT',
+        license_risk: 'none',
+        maintenance: 'deprecated', // org ruling: scalar private-wins
+        transitive_risk: null,
+        attestation: { source: 'hand', refs: ['acme internal'], fetched_at: '2026-06-02' },
+      }],
+    });
+    const view = lookupFactView('ua-parser-js', buildComposeDeps({ STARLOG_PRIVATE_FACTS: path }));
+    const upstream = view?.l2?.known_vulns.find((v) => v.id === 'INCIDENT:ua-parser-js-2021');
+    // base wins on the colliding id — the critical signal is NOT silently downgraded
+    expect(upstream?.severity).toBe('critical');
+    // union adds the org's net-new advisory
+    expect(view?.l2?.known_vulns.map((v) => v.id)).toContain('INCIDENT:acme-sbom-flag');
+    // scalar org ruling still wins
+    expect(view?.l2?.maintenance).toBe('deprecated');
+  });
+});
