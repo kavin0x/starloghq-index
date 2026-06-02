@@ -8,10 +8,17 @@ name: Publish facts-schema
 # One-time setup (owner task), in this order:
 #   1. The @starloghq scope must exist on npm (create the org/scope; it is
 #      separate from the unscoped `starloghq` package).
-#   2. After the FIRST publish, npmjs.com → @starloghq/facts-schema → Settings →
+#   2. BOOTSTRAP the first publish with a token (trusted publishing can't be
+#      configured on a package that doesn't exist yet): create a short-lived
+#      granular npm token scoped to @starloghq with publish rights, add it as the
+#      repo secret `NPM_TOKEN`, then push the `facts-schema-v0.1.0` tag. This run
+#      publishes 0.1.0 WITH provenance (token = registry auth; id-token:write +
+#      publishConfig.provenance still generate the attestation).
+#   3. After that first publish: npmjs.com → @starloghq/facts-schema → Settings →
 #      Trusted Publisher: Org/user `starloghq`, Repo `index`,
-#      Workflow `publish-facts-schema.yml`. (The first publish may need a
-#      short-lived granular token; subsequent ones use OIDC.)
+#      Workflow `publish-facts-schema.yml`. THEN DELETE the `NPM_TOKEN` secret —
+#      with it gone, NODE_AUTH_TOKEN renders empty and every later tag publishes
+#      via OIDC (no stored token).
 
 on:
   push:
@@ -52,8 +59,12 @@ jobs:
           PKG_VERSION="$(node -p "require('./package.json').version")"
           [ "$TAG" = "$PKG_VERSION" ] || { echo "::error::tag ${GITHUB_REF_NAME} != version ${PKG_VERSION}"; exit 1; }
 
-      - name: Publish to npm (OIDC, with provenance)
-        # Blank the dummy token setup-node writes into .npmrc so npm uses OIDC.
+      - name: Publish to npm (token bootstrap → OIDC, always with provenance)
+        # NODE_AUTH_TOKEN selects the auth method automatically:
+        #   • BOOTSTRAP (first publish): NPM_TOKEN secret is set → token registry auth.
+        #   • STEADY STATE: NPM_TOKEN deleted → renders empty → npm uses OIDC trusted
+        #     publishing (configured on npmjs.com after the first publish).
+        # Provenance is generated in BOTH modes (publishConfig.provenance=true + id-token:write).
         run: npm publish
         env:
-          NODE_AUTH_TOKEN: ""
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
