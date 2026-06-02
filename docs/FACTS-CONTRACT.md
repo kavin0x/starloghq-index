@@ -21,9 +21,12 @@ only in `composeFact()` → `FactView`, by reference.
 
 ## Where it runs (the boundary)
 
-- **Composition + L3 evaluation run CLIENT-SIDE.** `composeFact` + `evaluatePolicy`
-  (both from the package) run in the MCP client. The server/worker provides the
-  three independent *inputs*; it does **not** pre-collapse them or evaluate policy.
+- **Composition + L3 evaluation run CLIENT-SIDE.** `composeFact` lives client-side
+  (`src/engine/facts/compose.ts`); it builds the `FactView` and calls `evaluatePolicy`.
+  Of these the package supplies `evaluatePolicy` and the `FactView` type — the
+  composition function itself is client-only. Both run in the MCP client. The
+  server/worker provides the three independent *inputs*; it does **not** pre-collapse
+  them or evaluate policy.
   (Server-side verdict + a CT audit log is a later governance phase, not now.)
 - **L1 is read-only to clients/orgs.** Capability facts are author-controlled
   (analyzer/admin). Orgs supply L2 overlays and L3 policy, never L1.
@@ -76,7 +79,7 @@ Producers must EMIT the schemas, or the client can't read them:
 - `resolveFactView(pkg, { local, api })` — **API-first, per-layer API-wins, full local fallback**; `evaluatePolicy` runs client-side. Used by the MCP tool + `starlog facts lookup`.
 - `starlog facts push [file]` — `pushL2` (`POST /facts/l2`, batch `{overlays}`) + `pushPolicy` (`POST /facts/policy`); file shape `{ l2: L2Overlay[], policy?: L3Policy }`.
 
-**Still backend-side (not the client's to build):** the `GET/POST /facts*` endpoints, org identity + `org_id`-from-key isolation, KV/D1 storage — see `docs/alignment/sy5-correction-DRAFT.md`.
+**Still backend-side (not the client's to build):** the `GET/POST /facts*` endpoints, org identity + `org_id`-from-key isolation, KV/D1 storage — see `docs/alignment/sy5-correction.md`.
 
 ## Versioning rule
 

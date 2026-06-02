@@ -39,6 +39,15 @@ describe('overlaySource — union known_vulns by id (private may add, never supp
     expect(merged?.known_vulns.map((v) => v.id)).toEqual(['CVE-1']);
   });
 
+  it('keeps the upstream vuln when the private overlay records no vulns at all (the headline bug)', () => {
+    // The bare trigger of the original suppression: an org records only a
+    // license/maintenance ruling and says nothing about vulns. Whole-record
+    // private-wins used to empty known_vulns and flip has_known_vulns false.
+    const base = handAuthoredL2Source({ pkg: overlay({ package: 'pkg', known_vulns: [vuln('CVE-1', 'critical')] }) });
+    const priv = handAuthoredL2Source({ pkg: overlay({ package: 'pkg', license: 'UNLICENSED' }) });
+    expect(overlaySource(base, priv).lookup('pkg')?.known_vulns.map((v) => v.id)).toEqual(['CVE-1']);
+  });
+
   describe('both present', () => {
     const base = handAuthoredL2Source({
       pkg: overlay({

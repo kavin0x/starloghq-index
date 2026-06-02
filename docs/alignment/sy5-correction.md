@@ -1,15 +1,21 @@
-# DRAFT — correction to carry into starlogdev sy5 (facts API backend)
+# Correction to carry into starlogdev sy5 (facts API backend)
 
-> **Status:** DRAFT authored from the starlog-index side. To be reviewed by whoever
-> owns `starlogdev/.planning/quick/260601-sy5-…` (the human who wrote the
-> `ADDENDUM-l1l2l3` today) and folded into that planning trail. Not applied to
-> starlogdev by the index side.
+> **Status:** Final from the **starlog-index** side — pending review by the sy5 owner
+> (whoever wrote `starlogdev/.planning/quick/260601-sy5-…` / the `ADDENDUM-l1l2l3`).
+> These are recommendations, not changes applied to starlogdev: the index side
+> cannot see the sy5 repo, so every claim below about the *sy5 plan* (D-A, the §1
+> envelope, the drift-guard) is stated as the index author understood it and must
+> be validated against the actual plan before folding in. The claims about the
+> *index side* — the package, its exports, the client seams — are verified against
+> shipped code (`@starloghq/facts-schema` + `src/engine/facts/`).
 
 The sy5 ADDENDUM already re-anchored the design to the layered model. This closes
 the gap where the **executable steps** still point at the old flat schema, and
 locks three open details. The contract is now a real package: **`@starloghq/facts-schema`**
-(in starlog-index `packages/facts-schema`) — schemas + `evaluatePolicy` + `FactView`,
-zod-only, bundles into a Worker.
+(in starlog-index `packages/facts-schema`) — the L1/L2/L3 schemas + `evaluatePolicy`
++ the `FactView` type, zod-only, bundles into a Worker. (Note: `composeFact` — the
+composition function — stays client-side in starlog-index; the package supplies the
+schemas, `evaluatePolicy`, and the `FactView` type, not the composer.)
 
 ## 1. Schema sharing: IMPORT the package, don't vendor the flat schema (supersedes D-A + Phase 0 drift-guard)
 
