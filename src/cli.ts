@@ -100,7 +100,7 @@ program
     if (results.length === 0) {
       console.error(
         `No strong match in the local index. It covers: ${VALID_CATEGORIES.join(', ')}.\n` +
-        `Try a query in one of those areas, or enable semantic ranking (set OPENROUTER_API_KEY) for broader matching.`,
+        `Try rephrasing toward one of those capabilities.`,
       );
       process.exit(0);
     }

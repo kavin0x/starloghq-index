@@ -129,17 +129,9 @@ Options:
 
 ## Ranking
 
-Starlog picks a ranking mode automatically, in this order:
+**Keyword ranking is the default and the recommended mode.** It matches your query against each library's capability data and reports an *absolute* score, so an off-topic or out-of-corpus query returns "no strong match" instead of a forced result. It's offline — no key, no network.
 
-| Mode | When it's used | Setup |
-|---|---|---|
-| **Keyword** (default) | always, unless a mode below is configured | none — offline, no key, no network |
-| **Local semantic** | `siftrank` binary present **and** `OPENROUTER_API_KEY` set | needs Go (see below) |
-| **Hosted semantic** | `STARLOG_API_KEY` set | just the env var |
-
-**Keyword is the default and is the honest baseline** — it matches your query against each library's capability data and reports an *absolute* score, so an off-topic or out-of-corpus query returns "no strong match" instead of a forced result. Semantic ranking is **optional** and only sharpens the ordering.
-
-Run **`starlog doctor`** any time to see which mode is active and how to change it. To enable semantic ranking:
+**Semantic (LLM) reranking is experimental.** When configured it *reorders* the keyword-selected results (it never widens them, so out-of-domain queries still return nothing) — but its ranking quality isn't yet independently validated, so keyword remains the default. Run **`starlog doctor`** to see the active mode. To try semantic reranking:
 
 ```bash
 # Hosted — no local tooling:
@@ -150,7 +142,7 @@ go install github.com/noperator/siftrank/cmd/siftrank@latest
 export OPENROUTER_API_KEY=...        # siftrank ranks via OpenRouter
 ```
 
-Override the ranking model with `STARLOG_RANK_MODEL` (default `anthropic/claude-haiku-4.5`). With semantic ranking on, add `--context "<your project>"` to also get a per-library **`vs custom`** rationale.
+Override the model with `STARLOG_RANK_MODEL` (default `anthropic/claude-haiku-4.5`). With semantic reranking on, add `--context "<your project>"` for a per-library **`vs custom`** rationale.
 
 ## Auto-registry hook
 

@@ -254,10 +254,10 @@ function rankingState(): { tier: RankingTier; detail: string } {
   const hasBinary = existsSync(join(gopath, 'bin', 'siftrank'));
 
   if (process.env.STARLOG_API_KEY) {
-    return { tier: 'hosted', detail: 'semantic ranking via hosted API (STARLOG_API_KEY)' };
+    return { tier: 'hosted', detail: 'semantic ranking via hosted API (STARLOG_API_KEY) — experimental' };
   }
   if (hasBinary && process.env.OPENROUTER_API_KEY) {
-    return { tier: 'local-llm', detail: 'semantic ranking via local siftrank + OPENROUTER_API_KEY' };
+    return { tier: 'local-llm', detail: 'semantic ranking via local siftrank + OPENROUTER_API_KEY — experimental' };
   }
   return { tier: 'keyword', detail: 'keyword ranking — offline, no key, no network (the default)' };
 }
@@ -273,12 +273,14 @@ async function checkRanker(): Promise<Check> {
 // turn it on, both the zero-tooling hosted path and the advanced local path.
 function printRankingHelp(): void {
   console.log('');
-  console.log('Ranking: keyword (the default) works offline with no setup. Semantic (LLM)');
-  console.log('ranking is optional and only sharpens result ordering. To enable it:');
+  console.log('Ranking: keyword (the default) works offline with no setup and is the');
+  console.log('recommended mode. Semantic (LLM) reranking is EXPERIMENTAL — it only reorders');
+  console.log('the keyword-selected results and its quality is not yet independently validated.');
+  console.log('To try it:');
   console.log('');
   console.log('  • Hosted (no local tooling):');
   console.log('      export STARLOG_API_KEY=...        # routes search through the hosted ranker');
-  console.log('  • Local (advanced, needs Go):');
+  console.log('  • Local (needs Go):');
   console.log('      go install github.com/noperator/siftrank/cmd/siftrank@latest');
   console.log('      export OPENROUTER_API_KEY=...      # siftrank ranks via OpenRouter');
   console.log('');

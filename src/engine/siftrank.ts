@@ -16,6 +16,24 @@ function getSiftrankPath(): string {
 }
 
 /**
+ * siftrank's `key` field is a generated short hash, NOT our manifest id -- the
+ * original manifest is preserved in `object`. search() maps results back to the
+ * corpus by `key` against manifest ids, so without this re-keying every
+ * semantic result fails to map and the search returns empty. Re-point `key` to
+ * `object.id` so the rest of the pipeline matches. Exported for unit testing.
+ */
+export function rekeyByObjectId(results: SiftrankResult[]): SiftrankResult[] {
+  return results.map((r) => {
+    // siftrank preserves the original input object so we can map back to it.
+    // The current binary names that field `document`; older docs call it
+    // `object`. Check both, then re-point `key` to the manifest id.
+    const rec = r as unknown as { document?: { id?: unknown }; object?: { id?: unknown } };
+    const id = rec.document?.id ?? rec.object?.id;
+    return typeof id === 'string' ? { ...r, key: id } : r;
+  });
+}
+
+/**
  * Create a SiftrankFn that spawns the siftrank Go binary.
  *
  * Maps OPENROUTER_API_KEY to OPENAI_API_KEY and uses --base-url
@@ -52,8 +70,11 @@ export function createSiftrankFn(): SiftrankFn {
         maxBuffer: 10 * 1024 * 1024, // 10MB
       });
 
-      const results: SiftrankResult[] = JSON.parse(stdout);
-      return results.sort((a, b) => a.rank - b.rank);
+      const parsed: SiftrankResult[] = JSON.parse(stdout);
+      // Order by siftrank's authoritative `rank` (1 = best). siftrank's own
+      // `score` is "lower = better" (mean position), the opposite of this
+      // pipeline's convention, so it must NOT be used for ordering downstream.
+      return rekeyByObjectId(parsed).sort((a, b) => a.rank - b.rank);
     } finally {
       // Clean up temp file
       await unlink(tmpFile).catch(() => {});
@@ -219,46 +240,69 @@ export const keywordSiftrank: SiftrankFn = async (manifests, query) => {
 // carries the CLI's search output and the MCP stdio protocol.
 let warnedFallback = false;
 
+function warnFallback(message: string): void {
+  if (warnedFallback) return;
+  warnedFallback = true;
+  console.error(message);
+}
+
 /**
- * Wrap the real (LLM-backed) siftrank so a missing binary or API key degrades
- * to keyword ranking instead of crashing. search() does not catch siftrank
- * errors, so the resilience lives here. Shared by the `starlog search` CLI
- * command and the MCP server so both behave identically.
+ * The ranker the CLI and MCP server both use. Retrieve-then-rerank:
+ *
+ *   1. The validated keyword ranker RETRIEVES the relevant set -- it applies the
+ *      relevance floor + on-topic filter, so it decides *which* manifests are
+ *      relevant and returns nothing for out-of-corpus queries.
+ *   2. siftrank, when configured (binary + key), only REORDERS that set. It
+ *      never widens it, so the off-topic tail can't appear and the out-of-domain
+ *      protection carries into semantic mode for free.
+ *
+ * If siftrank is absent (the default) or errors, the keyword order stands. This
+ * keeps semantic ranking strictly additive: it can refine the order but never
+ * makes results worse than the keyword baseline. (Semantic reranking quality is
+ * not yet independently validated -- treated as experimental.)
  */
 export function createResilientSiftrankFn(): SiftrankFn {
   const real = createSiftrankFn();
   return async (manifests, query) => {
+    const eligible = await keywordSiftrank(manifests, query);
+    if (eligible.length === 0) return []; // out-of-corpus: nothing to rank
+
+    const eligibleIds = new Set(eligible.map((r) => r.key));
+    const subset = manifests.filter((m) => eligibleIds.has(m.id));
+
     try {
-      return await real(manifests, query);
-    } catch (err) {
-      if (!warnedFallback) {
-        warnedFallback = true;
-        const raw = err instanceof Error ? err.message : String(err);
-        // A missing binary (ENOENT) is the ordinary default — no siftrank
-        // installed — so frame keyword ranking as a first-class mode, not a
-        // failure. A binary that is present but errored is unexpected, so keep
-        // the first line of its cause to aid debugging.
-        if (/ENOENT/.test(raw)) {
-          // No siftrank binary -- the ordinary default. Frame keyword ranking
-          // as a first-class mode and point to `doctor` for the (optional)
-          // upgrade rather than dumping setup steps on every search.
-          console.error(
-            '[starlog] Using keyword ranking (offline default). ' +
-            'For sharper semantic ranking, run: starlog doctor',
-          );
-        } else {
-          // The binary is present but errored. Don't leak the full command and
-          // temp-file path (ugly and noisy) -- surface just the exit code and
-          // route to `doctor`, which explains exactly what to configure.
-          const e = err as { code?: number | string };
-          const exit = typeof e.code === 'number' ? ` (exit ${e.code})` : '';
-          console.error(
-            `[starlog] siftrank failed${exit}; using keyword ranking instead. ` +
-            'Run `starlog doctor` to check your ranking setup.',
-          );
-        }
+      const ranked = await real(subset, query);
+      const ordered = ranked.filter((r) => eligibleIds.has(r.key));
+      if (ordered.length === 0) {
+        warnFallback('[starlog] siftrank returned no usable ranking; using keyword order. Run `starlog doctor`.');
+        return eligible;
       }
-      return keywordSiftrank(manifests, query);
+      // Present siftrank's order with the keyword relevance magnitudes assigned
+      // highest-first, so the score column stays monotonic instead of exposing
+      // siftrank's inverted internal score.
+      const scoresDesc = eligible.map((r) => r.score).sort((a, b) => b - a);
+      const fallbackScore = scoresDesc[scoresDesc.length - 1] ?? 0;
+      return ordered.map((r, i) => ({ ...r, score: scoresDesc[i] ?? fallbackScore, rank: i + 1 }));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      if (/ENOENT/.test(raw)) {
+        // No siftrank binary -- the ordinary default. Keyword ranking is the
+        // first-class mode; point to `doctor` for the (experimental) upgrade.
+        warnFallback(
+          '[starlog] Using keyword ranking (offline default). ' +
+          'For experimental semantic ranking, run: starlog doctor',
+        );
+      } else {
+        // Binary present but errored. Don't leak the command/temp path -- just
+        // the exit code and a pointer to `doctor`.
+        const e = err as { code?: number | string };
+        const exit = typeof e.code === 'number' ? ` (exit ${e.code})` : '';
+        warnFallback(
+          `[starlog] siftrank failed${exit}; using keyword ranking instead. ` +
+          'Run `starlog doctor` to check your ranking setup.',
+        );
+      }
+      return eligible;
     }
   };
 }

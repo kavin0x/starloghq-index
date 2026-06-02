@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { keywordSiftrank } from './siftrank.js';
+import { keywordSiftrank, rekeyByObjectId } from './siftrank.js';
 import type { CapabilityManifest } from '../manifest/schema.js';
+import type { SiftrankResult } from './types.js';
 
 // Minimal manifest factory -- only the fields the keyword ranker reads matter;
 // the rest satisfy the type without affecting scoring.
@@ -65,6 +66,34 @@ const CORPUS: CapabilityManifest[] = [
   manifest({ id: 'f-orm', name: 'Kysely', category: 'orm-database', solves: 'typed SQL query builder', stack_affinity: ['node'] }),
   manifest({ id: 'f-rt2', name: 'Ably', category: 'realtime', solves: 'realtime messaging platform', stack_affinity: ['node'] }),
 ];
+
+describe('rekeyByObjectId', () => {
+  it('repoints the hashed key to the original manifest id from object', () => {
+    // siftrank emits a generated hash as `key` and the original object in `object`.
+    const raw: SiftrankResult[] = [
+      { key: 'a1b2c3', value: 'Clerk: managed auth', object: { id: 'clerk', name: 'Clerk' }, score: 90, exposure: 1, rank: 1 },
+      { key: 'd4e5f6', value: 'Auth0: oauth', object: { id: 'auth0', name: 'Auth0' }, score: 80, exposure: 1, rank: 2 },
+    ];
+    const out = rekeyByObjectId(raw);
+    expect(out.map((r) => r.key)).toEqual(['clerk', 'auth0']);
+    // Score/rank are untouched.
+    expect(out[0].score).toBe(90);
+  });
+
+  it('repoints from the `document` field too (current siftrank binary)', () => {
+    const raw = [
+      { key: 'xyz789', value: 'Inngest: jobs', document: { id: 'inngest' }, score: 70, exposure: 1, rank: 1 },
+    ] as unknown as SiftrankResult[];
+    expect(rekeyByObjectId(raw)[0].key).toBe('inngest');
+  });
+
+  it('leaves the key unchanged when object has no string id', () => {
+    const raw: SiftrankResult[] = [
+      { key: 'hash', value: 'v', object: {}, score: 1, exposure: 1, rank: 1 },
+    ];
+    expect(rekeyByObjectId(raw)[0].key).toBe('hash');
+  });
+});
 
 describe('keywordSiftrank', () => {
   it('ranks the on-category libraries first and drops off-category noise', async () => {
