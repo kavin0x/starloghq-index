@@ -3,24 +3,51 @@
   "version": "0.1.0",
   "description": "Canonical L1/L2/L3 facts contract for Starlog — zod schemas + policy semantics shared by the client and the API/worker. Zero deps except zod.",
   "license": "BUSL-1.1",
+  "author": "Starlog",
+  "homepage": "https://github.com/starloghq/index/tree/main/packages/facts-schema",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/starloghq/index.git",
+    "directory": "packages/facts-schema"
+  },
+  "bugs": {
+    "url": "https://github.com/starloghq/index/issues"
+  },
+  "keywords": [
+    "starlog",
+    "facts",
+    "schema",
+    "zod",
+    "supply-chain",
+    "sbom"
+  ],
   "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
-  "files": [
-    "src/",
-    "dist/"
-  ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
+    "prepublishOnly": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

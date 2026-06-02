@@ -1,0 +1,59 @@
+name: Publish facts-schema
+
+# Publishes @starloghq/facts-schema to npm via Trusted Publishing (OIDC) when a
+# facts-schema-v* tag is pushed (independent of the starloghq app's v* tags).
+# No stored token — GitHub OIDC authenticates to npm; provenance is automatic
+# (publishConfig.provenance=true).
+#
+# One-time setup (owner task), in this order:
+#   1. The @starloghq scope must exist on npm (create the org/scope; it is
+#      separate from the unscoped `starloghq` package).
+#   2. After the FIRST publish, npmjs.com → @starloghq/facts-schema → Settings →
+#      Trusted Publisher: Org/user `starloghq`, Repo `index`,
+#      Workflow `publish-facts-schema.yml`. (The first publish may need a
+#      short-lived granular token; subsequent ones use OIDC.)
+
+on:
+  push:
+    tags: ['facts-schema-v*']
+
+permissions:
+  contents: read
+  id-token: write # required for npm OIDC trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/facts-schema
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x # >= 22.14 required for trusted publishing
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Ensure npm >= 11.5.1 (trusted publishing)
+        run: npm install -g npm@latest
+
+      - name: Install + build (the package is zero-config tsc)
+        run: |
+          npm ci --workspaces --include-workspace-root
+          npm run build -w @starloghq/facts-schema
+        working-directory: ${{ github.workspace }}
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#facts-schema-v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          [ "$TAG" = "$PKG_VERSION" ] || { echo "::error::tag ${GITHUB_REF_NAME} != version ${PKG_VERSION}"; exit 1; }
+
+      - name: Publish to npm (OIDC, with provenance)
+        # Blank the dummy token setup-node writes into .npmrc so npm uses OIDC.
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ""

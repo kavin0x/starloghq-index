@@ -1,0 +1,8 @@
+# NOTE: the `files` whitelist in package.json is authoritative for what ships
+# (it must be, because the repo-root .gitignore excludes dist/, which npm
+# otherwise honors). This file documents the dev-only excludes for clarity.
+tsconfig.json
+*.tsbuildinfo
+*.test.ts
+node_modules/
+.DS_Store
