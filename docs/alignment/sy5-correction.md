@@ -20,7 +20,7 @@ schemas, `evaluatePolicy`, and the `FactView` type, not the composer.)
 ## 1. Schema sharing: IMPORT the package, don't vendor the flat schema (supersedes D-A + Phase 0 drift-guard)
 
 - **D-A as written** vendors `FactRecordSchema` from `src/benchmark/facts/types.ts` — the **old flat** schema (now retired in starlog-index). **Do not vendor it.**
-- **Instead:** `workers/starlog-api` adds `@starloghq/facts-schema` as a dependency and imports `L1CapabilityFactSchema`, `L2OverlaySchema`, `L3PolicySchema`, `evaluatePolicy`, `FactView` from it. zod comes with it (the package is zod-only — this removes the "zod bloats the Workers bundle" objection that motivated vendoring).
+- **Instead:** `workers/starlog-api` adds `@starloghq/facts-schema` as a dependency and imports the **three schemas** — `L1CapabilityFactSchema`, `L2OverlaySchema`, `L3PolicySchema` — to validate reads/writes. It does **not** import `evaluatePolicy` or `FactView`: those are client-side (the worker serves `{l1,l2,l3,found}` raw and never composes or evaluates policy; a server-side verdict is an explicitly-later governance phase, not P3.5). zod comes with the package (it is zod-only — this removes the "zod bloats the Workers bundle" objection that motivated vendoring).
 - **Phase 0's drift-guard test is no longer needed** (there's nothing to drift from — one artifact). Replace it with a `package.json` version pin + a build that fails on a missing/mismatched `@starloghq/facts-schema`.
 - **RESEARCH source list:** replace `src/benchmark/facts/types.ts` (FactRecordSchema) and `src/engine/facts.ts` (loadFactMap/lookupFacts, the old collapsed API) with `@starloghq/facts-schema` and starlog-index `src/engine/facts/` (layered).
 
