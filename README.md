@@ -28,7 +28,7 @@ AI coding agents (Claude Code, Cursor, Copilot) pick libraries from their traini
 
 AI-suggested dependencies are also often unsafe: research finds ~49% carry known vulnerabilities and ~34% are hallucinated outright — the package simply doesn't exist. Picking a real, well-maintained library, and knowing when to skip one, is most of the battle.
 
-Starlog is a local **capability index** for AI coding agents: a structured, queryable description of what libraries actually do, ranked by fitness for your task and by health/quality signals — not by download count or stars. It runs entirely on your machine as an MCP server and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
+Starlog is a local **capability index** for AI coding agents: a structured, queryable description of what libraries actually do — what each solves, which stacks it fits, and when to skip one — put in front of your agent at decision time instead of training-data recall. Results are ranked by how well a library's capability data fits your task, plus health/quality signals (not download count or stars). It runs entirely on your machine as an MCP server and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
 
 **Benchmarked across 1,008 runs on 3 Claude models:**
 
@@ -40,7 +40,7 @@ Starlog is a local **capability index** for AI coding agents: a structured, quer
 
 ## What you get
 
-- **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets ranked, structured answers instead of training-data recall.
+- **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets real, structured capability data (ranked by relevance) instead of training-data recall.
 - **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces that library's `skip_when` conditions and alternatives as context, so the agent can reconsider or swap before building on it. It's advisory — it informs the agent's next move, it doesn't block the install.
 - **`starlog search` CLI** — query the same index directly from your terminal.
 - **Runs on your machine** — the engine and corpus are local; searches need no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)
@@ -200,7 +200,7 @@ Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-s
 
 ### Known limitation: diversity trade-off
 
-Starlog reduces recommendation diversity by ~30%. Manifests narrow the option space — agents converge on fewer libraries. This is actively being investigated. The reduction in hand-rolled code holds across both context-injection and tool-use delivery, suggesting it's a property of the data, not the transport.
+Starlog narrows the option space — by steering toward vetted libraries, agents converge on fewer of them (a measured ~30% diversity reduction). That's an inherent trade-off of recommending proven options over maximal variety. The reduction in hand-rolled code holds across both context-injection and tool-use delivery, indicating it's a property of the capability data, not the delivery method.
 
 ## Categories
 
