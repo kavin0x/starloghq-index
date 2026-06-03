@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -46,6 +46,11 @@ function runFacts(args: string[], env?: Record<string, string>): RunResult {
   // public-corpus baseline runs. Explicit per-test overrides are applied last.
   const childEnv: Record<string, string | undefined> = { ...process.env };
   delete childEnv.STARLOG_PRIVATE_FACTS;
+  // Also drop STARLOG_API_KEY (else resolveFactView goes API-first → network/flaky)
+  // and STARLOG_POLICY (else an inherited org verdict leaks into baseline runs).
+  // Explicit per-test overrides below still win.
+  delete childEnv.STARLOG_API_KEY;
+  delete childEnv.STARLOG_POLICY;
   Object.assign(childEnv, env ?? {});
   try {
     const stdout = execFileSync(
@@ -202,5 +207,183 @@ describe('starlog facts CLI (e2e, spawned binary)', () => {
       expect(stdout).toContain('## chalk (npm)');
       expect(stdout).toContain('Terminal string styling');
     });
+  });
+});
+
+/**
+ * Authoring (`facts add` / `facts policy`) e2e — Phase 11. Spawns the built
+ * binary and proves the author→vet loop: a minimal one-command add writes a
+ * schema-valid record that `facts <pkg>` reads back; a policy verdict renders;
+ * bad input fails loudly (AUTH-04); and — the phase's CORE story — the env-UNSET
+ * default-path branch works hermetically from a temp cwd.
+ */
+describe('starlog facts authoring (add / policy) e2e', () => {
+  let tmpDir: string | null = null;
+
+  // env-UNSET helper (W1): spawn from a temp cwd with an ABSOLUTE cli path so
+  // the relative default `.starlog/private-facts.json` resolves UNDER tmpDir
+  // (no repo-tree pollution). A relative CLI from cwd:tmpDir would ENOENT, so
+  // both the absolute cli path AND the tmp cwd are required together.
+  function runFactsInDir(cwd: string, args: string[], env?: Record<string, string>): RunResult {
+    const childEnv: Record<string, string | undefined> = { ...process.env };
+    delete childEnv.STARLOG_PRIVATE_FACTS;
+    delete childEnv.STARLOG_API_KEY;
+    delete childEnv.STARLOG_POLICY;
+    Object.assign(childEnv, env ?? {});
+    try {
+      const stdout = execFileSync('node', [join(REPO, 'dist/cli.js'), '--no-telemetry', 'facts', ...args], {
+        cwd,
+        encoding: 'utf8',
+        env: childEnv,
+      });
+      return { status: 0, stdout, stderr: '' };
+    } catch (err) {
+      const e = err as { status?: number | null; stdout?: string | Buffer; stderr?: string | Buffer };
+      return {
+        status: typeof e.status === 'number' ? e.status : -1,
+        stdout: e.stdout ? e.stdout.toString() : '',
+        stderr: e.stderr ? e.stderr.toString() : '',
+      };
+    }
+  }
+
+  function newTmpDir(): string {
+    tmpDir = mkdtempSync(join(tmpdir(), 'starlog-authoring-e2e-'));
+    return tmpDir;
+  }
+
+  afterEach(() => {
+    if (tmpDir) {
+      rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = null;
+    }
+  });
+
+  // 1. ROUND-TRIP — the headline: one command writes a valid record that
+  //    `facts <pkg>` reads back (AUTH-01 + AUTH-02 through the real binary).
+  it('add → lookup round-trips a private-only package (AUTH-01/02)', () => {
+    const dir = newTmpDir();
+    const privPath = join(dir, 'private-facts.json');
+
+    const add = runFacts(['add', '@acme/roundtrip', '--license', 'MIT', '--status', 'active'], {
+      STARLOG_PRIVATE_FACTS: privPath,
+    });
+    expect(add.status).toBe(0);
+    expect(add.stdout).toContain('Added @acme/roundtrip to ');
+    expect(add.stdout).toContain(privPath);
+
+    const parsed = JSON.parse(readFileSync(privPath, 'utf8'));
+    expect(Array.isArray(parsed.l1)).toBe(true);
+    expect(parsed.l2[0].package).toBe('@acme/roundtrip');
+    expect(parsed.l2[0].attestation.source).toBe('hand');
+    expect(parsed.l2[0].attestation.fetched_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const vet = runFacts(['@acme/roundtrip'], { STARLOG_PRIVATE_FACTS: privPath });
+    expect(vet.status).toBe(0);
+    expect(vet.stdout).toContain('## @acme/roundtrip (npm)');
+    expect(vet.stdout).toContain('**License:** MIT');
+    expect(vet.stdout).toContain('**Maintenance:** active');
+  });
+
+  // 2. UPSERT — same package replaced in place; a second package coexists.
+  it('add upserts the same package and preserves a second one', () => {
+    const dir = newTmpDir();
+    const privPath = join(dir, 'private-facts.json');
+
+    runFacts(['add', '@acme/roundtrip', '--license', 'MIT', '--status', 'active'], { STARLOG_PRIVATE_FACTS: privPath });
+    runFacts(['add', '@acme/roundtrip', '--license', 'MIT', '--status', 'deprecated'], { STARLOG_PRIVATE_FACTS: privPath });
+    let parsed = JSON.parse(readFileSync(privPath, 'utf8'));
+    expect(parsed.l2).toHaveLength(1);
+    expect(parsed.l2[0].maintenance).toBe('deprecated');
+
+    runFacts(['add', '@acme/other', '--license', 'MIT', '--status', 'active'], { STARLOG_PRIVATE_FACTS: privPath });
+    parsed = JSON.parse(readFileSync(privPath, 'utf8'));
+    expect(parsed.l2).toHaveLength(2);
+    const pkgs = parsed.l2.map((o: { package: string }) => o.package).sort();
+    expect(pkgs).toEqual(['@acme/other', '@acme/roundtrip']);
+  });
+
+  // 3. POLICY → verdict renders (AUTH-03).
+  it('policy verdict renders in facts <pkg> (AUTH-03)', () => {
+    const dir = newTmpDir();
+    const privPath = join(dir, 'private-facts.json');
+    const polPath = join(dir, 'policy.json');
+
+    // Give it an L2 record so the package resolves and the verdict can attach.
+    runFacts(['add', '@acme/policed', '--license', 'MIT', '--status', 'active'], { STARLOG_PRIVATE_FACTS: privPath });
+
+    const setPolicy = runFacts(['policy', '@acme/policed', 'deny', '--reason', 'banned by security'], {
+      STARLOG_PRIVATE_FACTS: privPath,
+      STARLOG_POLICY: polPath,
+    });
+    expect(setPolicy.status).toBe(0);
+    expect(setPolicy.stdout).toContain('Set org verdict DENY for @acme/policed');
+
+    const parsed = JSON.parse(readFileSync(polPath, 'utf8'));
+    expect(typeof parsed.org).toBe('string');
+    expect(parsed.rules[0].id).toBe('pkg-@acme/policed');
+    expect(parsed.rules[0].decision).toBe('deny');
+
+    const vet = runFacts(['@acme/policed'], { STARLOG_PRIVATE_FACTS: privPath, STARLOG_POLICY: polPath });
+    expect(vet.status).toBe(0);
+    expect(vet.stdout).toContain('**Org policy:** DENY');
+    expect(vet.stdout).toContain('banned by security');
+  });
+
+  // 4. ERRORS (AUTH-04) — each exits non-zero with an actionable message.
+  it('missing --license exits non-zero with a license error', () => {
+    const { status, stderr } = runFacts(['add', '@acme/x', '--status', 'active']);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain('license');
+  });
+
+  it('bad --status exits non-zero with "Invalid --status" naming the value', () => {
+    const { status, stderr } = runFacts(['add', '@acme/x', '--license', 'MIT', '--status', 'bogus']);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain('Invalid --status');
+    expect(stderr).toContain('bogus');
+  });
+
+  it('bad verdict exits non-zero with "Invalid verdict" naming the value', () => {
+    const { status, stderr } = runFacts(['policy', '@acme/x', 'maybe']);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain('Invalid verdict');
+    expect(stderr).toContain('maybe');
+  });
+
+  it('bad --vuln severity exits non-zero with "Invalid vuln severity"', () => {
+    const { status, stderr } = runFacts([
+      'add',
+      '@acme/x',
+      '--license',
+      'MIT',
+      '--status',
+      'active',
+      '--vuln',
+      'CVE-1:nope:bad',
+    ]);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain('Invalid vuln severity');
+  });
+
+  // 5. ENV-UNSET author→vet (W1) — the phase's CORE user story, hermetic.
+  it('env-UNSET add writes the default path + prints the nudge, and the nudged vet reads it back', () => {
+    const dir = newTmpDir();
+
+    // NO env arg → STARLOG_PRIVATE_FACTS stays unset; cwd is tmpDir so the
+    // relative default resolves under tmpDir.
+    const add = runFactsInDir(dir, ['add', '@acme/unset', '--license', 'MIT', '--status', 'active']);
+    expect(add.status).toBe(0);
+    expect(add.stdout).toContain('export STARLOG_PRIVATE_FACTS=');
+
+    const defaultPath = join(dir, '.starlog', 'private-facts.json');
+    const parsed = JSON.parse(readFileSync(defaultPath, 'utf8'));
+    expect(parsed.l2[0].package).toBe('@acme/unset');
+
+    // Follow the nudge: set the absolute path the loader reads verbatim.
+    const vet = runFactsInDir(dir, ['@acme/unset'], { STARLOG_PRIVATE_FACTS: defaultPath });
+    expect(vet.status).toBe(0);
+    expect(vet.stdout).toContain('## @acme/unset (npm)');
+    expect(vet.stdout).toContain('**License:** MIT');
   });
 });
