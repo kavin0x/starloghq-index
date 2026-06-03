@@ -3,6 +3,16 @@ import type { SearchOptions, SiftrankFn, LlmFn, SiftrankResult } from './types.j
 import { mmrRerank } from './rerank.js';
 
 /**
+ * Minimum relevance score for an org-private (STARLOG_PRIVATE_CORPUS) result to
+ * be floated FIRST. Tied to the EXISTING low-confidence bar used at cli.ts:123
+ * and mcp.ts:27 — search only hard-filters category/stack, so an off-topic
+ * private manifest (e.g. an org auth package on a "caching" query) is still in
+ * `filtered`; this guard keeps it from hijacking position #1. Only RELEVANT
+ * private matches surface first.
+ */
+const PRIVATE_FLOAT_MIN_SCORE = 70;
+
+/**
  * Query engine pure function. Filters corpus, ranks via siftrank,
  * optionally generates vs_custom and tradeoffs via LLM.
  *
@@ -70,6 +80,17 @@ export async function search(
   } else {
     ranked = [...siftrankResults].sort((a, b) => b.score - a.score);
   }
+
+  // FACTS-03 private-first overlay: float org-sanctioned (STARLOG_PRIVATE_CORPUS)
+  // results that are RELEVANT (score >= PRIVATE_FLOAT_MIN_SCORE) ahead of the
+  // rest, BEFORE the topK slice — a pure stable partition. Scoring and MMR are
+  // untouched (this is NOT a ranking engine). With no privateIds it is a no-op.
+  const isFloatedPrivate = (r: SiftrankResult): boolean =>
+    options.privateIds?.has(r.key) === true && r.score >= PRIVATE_FLOAT_MIN_SCORE;
+  if (options.privateIds && options.privateIds.size > 0) {
+    ranked = [...ranked.filter(isFloatedPrivate), ...ranked.filter((r) => !isFloatedPrivate(r))];
+  }
+
   const topResults = ranked.slice(0, topK);
 
   // MMR reorders by *marginal* relevance, which would print the score column out
@@ -77,7 +98,17 @@ export async function search(
   // as a selection step: keep the diverse top-k MMR chose, but present them
   // highest-score-first so the displayed scores are always monotonic. (For
   // lambda>=1 the set is already score-descending, so this is a no-op there.)
-  topResults.sort((a, b) => b.score - a.score);
+  //
+  // FACTS-03: a plain `b.score - a.score` would undo the private-first partition,
+  // so key on [floated-private first, then score desc]. This keeps RELEVANT
+  // org-sanctioned picks visible at top WITHOUT altering relevance scores and
+  // WITHOUT surfacing off-topic private packages. When nothing floats (no
+  // privateIds, or none relevant) this collapses to pure score-desc — byte
+  // identical to the prior behavior.
+  topResults.sort(
+    (a, b) =>
+      (isFloatedPrivate(b) ? 1 : 0) - (isFloatedPrivate(a) ? 1 : 0) || b.score - a.score,
+  );
 
   // Step 6: Generate vs_custom + tradeoffs via LLM (QENG-03, QENG-04)
   let analysisMap = new Map<string, { vs_custom: string; context_fit: string; tradeoffs: string[] }>();

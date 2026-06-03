@@ -6,6 +6,10 @@ export interface SearchOptions {
   topK?: number;           // default 5
   projectContext?: string; // for vs_custom generation
   diversityLambda?: number; // 0-1, default 0.5 (MMR ON, Phase 6-validated). 0=max diversity, 1=pure relevance (opt out). Per D-07 + Phase 0 trust-reset.
+  // Manifest ids from STARLOG_PRIVATE_CORPUS to float FIRST (org-sanctioned),
+  // applied as a pure pre-slice partition that does NOT change scoring (FACTS-03).
+  // Only RELEVANT private matches (score >= PRIVATE_FLOAT_MIN_SCORE) are floated.
+  privateIds?: Set<string>;
 }
 
 export interface SiftrankResult {

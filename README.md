@@ -4,7 +4,7 @@
 
 <h1 align="center">Starlog</h1>
 
-<p align="center"><strong>Better library decisions for your AI coding agent — free, local, no account.</strong></p>
+<p align="center"><strong>Vet a package before your AI coding agent uses it — authoritative facts (CVEs, license, maintenance), free, local, no account.</strong></p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/starloghq"><img src="https://img.shields.io/npm/v/starloghq?color=cb3837&logo=npm" alt="npm version"></a>
@@ -14,13 +14,13 @@
 </p>
 
 <p align="center">
-  <img src="demo/starlog-demo.gif" alt="Starlog returning ranked library recommendations in the terminal, then wiring itself into Claude Code, Cursor, Copilot and Codex with one command" width="820">
+  <img src="demo/starlog-demo.gif" alt="Starlog vetting a package by name in the terminal, then wiring itself into Claude Code, Cursor, Copilot and Codex with one command" width="820">
 </p>
 
-**Try it in one command — nothing to install, no API key, no account:**
+**Vet a package in one command — nothing to install, no API key, no account:**
 
 ```bash
-npx starloghq search "auth for a Next.js app"
+npx starloghq facts ua-parser-js
 ```
 
 Then wire it into your coding agent (Claude Code, Cursor, Copilot, Codex):
@@ -39,7 +39,7 @@ AI coding agents (Claude Code, Cursor, Copilot) pick libraries from their traini
 
 AI-suggested dependencies are also often unsafe: research finds ~49% carry known vulnerabilities and ~34% are hallucinated outright — the package simply doesn't exist. Picking a real, well-maintained library, and knowing when to skip one, is most of the battle.
 
-Starlog is a local **capability index** for AI coding agents: a structured, queryable description of what libraries actually do — what each solves, which stacks it fits, and when to skip one — put in front of your agent at decision time instead of training-data recall. Results are ranked by how well a library's capability data fits your task, plus health/quality signals (not download count or stars). It runs entirely on your machine as an MCP server and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
+Starlog is a local **capability index** for AI coding agents: a structured, queryable description of what libraries actually do — what each solves, which stacks it fits, and when to skip one — put in front of your agent at decision time instead of training-data recall. Its hero surface is **vetting by name**: `starlog facts <package>` returns authoritative, dated facts (known CVEs/incidents, SPDX license + risk, maintenance status, capability) — or an honest "no facts on file" — so your agent makes the install/avoid/pick call on facts, not training-data recall. It runs entirely on your machine as an MCP server and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
 
 **Benchmarked across 1,008 runs on 3 Claude models:**
 
@@ -51,8 +51,8 @@ Starlog is a local **capability index** for AI coding agents: a structured, quer
 
 ## What you get
 
-- **`starlog_search` MCP tool** — your agent queries library capabilities in natural language and gets real, structured capability data (ranked by relevance) instead of training-data recall.
 - **`starlog_facts` MCP tool** — your agent looks up **authoritative facts about a specific package** before recommending it: known CVEs/supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and effect surface. In a 4-model benchmark, agents called this tool unprompted on package decisions (100% recall, 98% specificity) and it moved them toward the correct install/avoid/pick call. Every record is sourced, verified, and **dated** — each result shows an "as of `<date>`" line so a stale "no known vulns" is never mistaken for a fresh one (the corpus is refreshed and re-verified on an ongoing basis). A package with no record returns an honest "no facts on file." Facts are organized in three independent layers, composed at query time: **L1** capability/effect-surface (immutable), **L2** reputation/vuln/license/maintenance (mutable — carries the `as of` recency), and **L3** org policy (your suitability verdict). Override or extend any of them locally: point `STARLOG_PRIVATE_FACTS` at a JSON file with independent `l1`/`l2` arrays (internal packages, license rulings), and `STARLOG_POLICY` at an org policy (`{ org, rules }`) to get allow/deny/flag verdicts at decision time. With a `STARLOG_API_KEY` set, org-private overlays and policy are served from the hosted facts API (authoritative, with the local corpus as the offline fallback); `starlog facts push` uploads your org's overlays + policy. See [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
+- **`starlog_search` MCP tool** — your agent discovers candidate packages for a capability (org-sanctioned options first), then vets the named pick with `starlog_facts`. Discovery surfaces what exists; facts vet it.
 - **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces that library's `skip_when` conditions and alternatives as context, so the agent can reconsider or swap before building on it. It's advisory — it informs the agent's next move, it doesn't block the install.
 - **`starlog search` / `starlog facts` CLI** — query the same index and facts corpus directly from your terminal.
 - **Runs on your machine** — the engine and corpus are local; searches need no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)

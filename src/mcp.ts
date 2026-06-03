@@ -75,7 +75,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'starlog_search',
-    'Search the Starlog capability manifest corpus. Returns ranked library recommendations for a given use case, with integration effort, best-for scenarios, skip-when conditions, hosted alternatives, and (when project context is supplied) DIY-vs-buy analysis. Use this when deciding which library or service to use for a specific capability.',
+    'Discover candidate packages for a capability: surfaces options for a need (org-sanctioned/private ones first when configured), with integration effort, best-for and skip-when notes. This is discovery — it surfaces what exists; to vet a specific named package (CVEs, license, maintenance), call starlog_facts. Use after you have a capability/need and want candidate package names.',
     {
       query: z.string().describe('What you need, e.g. "auth for Next.js SaaS" or "background job queue for Node.js"'),
       category: z.string().optional().describe(`Filter to a category. Known categories: ${KnownCategorySchema.options.join(', ')}. Any other string is accepted for dynamic categories (parity with the CLI).`),
