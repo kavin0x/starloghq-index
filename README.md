@@ -127,7 +127,7 @@ starlog search "auth for a Next.js app"
 2   Clerk               authentication    60.64   Provides a fully managed authentication and user management platfor...
 ```
 
-Out of the box this uses the **local keyword ranker** — no API key, no network. Scores are absolute (a strong match lands in the 70s–80s; weak matches stay low), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer. See [**Ranking**](#ranking) to optionally enable semantic ranking, and `--context` below for `vs custom` analysis.
+Out of the box this uses the **local keyword ranker** — no API key, no network. Scores are absolute (a strong match lands in the 70s–80s; weak matches stay low), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer. See `--context` below for `vs custom` analysis.
 
 Options:
 
@@ -141,20 +141,7 @@ Options:
 
 ## Ranking
 
-**Keyword ranking is the default and the recommended mode.** It matches your query against each library's capability data and reports an *absolute* score, so an off-topic or out-of-corpus query returns "no strong match" instead of a forced result. It's offline — no key, no network.
-
-**Semantic (LLM) reranking is experimental.** When configured it *reorders* the keyword-selected results (it never widens them, so out-of-domain queries still return nothing) — but its ranking quality isn't yet independently validated, so keyword remains the default. Run **`starlog doctor`** to see the active mode. To try semantic reranking:
-
-```bash
-# Hosted — no local tooling:
-export STARLOG_API_KEY=...
-
-# Local — needs the Go toolchain:
-go install github.com/noperator/siftrank/cmd/siftrank@latest
-export OPENROUTER_API_KEY=...        # siftrank ranks via OpenRouter
-```
-
-Override the model with `STARLOG_RANK_MODEL` (default `anthropic/claude-haiku-4.5`). With semantic reranking on, add `--context "<your project>"` for a per-library **`vs custom`** rationale.
+Starlog ranks results with its **keyword ranker** — the default and only mode. It matches your query against each library's capability data and reports an *absolute* score, so an off-topic or out-of-corpus query returns "no strong match" instead of a forced result. It runs offline: no key, no network, no setup. Add `--context "<your project>"` for a per-library **`vs custom`** rationale.
 
 ## Auto-registry hook
 
