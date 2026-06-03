@@ -11,11 +11,16 @@ import {
   resolveFactView,
   createFactsApiClient,
   formatFactView,
+  buildL2FromInput,
+  upsertL2Entry,
+  buildL3Rule,
+  upsertPolicy,
   L2OverlaySchema,
   L3PolicySchema,
   type L2Overlay,
 } from './engine/facts.js';
 import { readFileSync } from 'node:fs';
+import { atomicWrite } from './fsutil.js';
 import { getPackageVersion } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
@@ -223,6 +228,128 @@ facts
     }
     // A miss is an honest answer, not an error — exit 0 either way.
   }));
+
+// Documented default paths for LOCAL authoring (distinct from push's
+// `.starlog/facts.json`, which is a different shape). These match the file
+// shapes loadPrivateFacts / loadPolicy read back.
+const DEFAULT_PRIVATE_FACTS = '.starlog/private-facts.json';
+const DEFAULT_POLICY = '.starlog/policy.json';
+
+/** ENOENT-tolerant JSON read: missing file → null; malformed JSON → throws
+ *  (SyntaxError → fail() prints the "invalid JSON — fix or remove" message,
+ *  so we never silently clobber an existing-but-broken file). */
+function readJsonIfPresent(path: string): unknown {
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+// `starlog facts add <package>` — write/upsert a private L2 overlay LOCALLY
+// (no hosted API call; that's `facts push`). Minimal input is --license +
+// --status; defaults fill the rest so it validates (AUTH-01/02). Bad input
+// fails loudly with a non-zero exit (AUTH-04).
+facts
+  .command('add <package>')
+  .description('Add or update a private fact (L2 overlay) for a package — license, maintenance, optional vulns')
+  .requiredOption('--license <spdx>', 'SPDX license id (e.g. MIT)')
+  .requiredOption('--status <maintenance>', 'active | maintenance-only | deprecated | abandoned | compromised')
+  .option('--ecosystem <eco>', 'npm | pypi | system', 'npm')
+  .option('--license-risk <risk>', 'none | copyleft-weak | copyleft-strong | unknown', 'none')
+  .option(
+    '--vuln <id:severity:summary>',
+    'A known vuln/incident (repeatable)',
+    (v: string, acc: string[]) => {
+      acc.push(v);
+      return acc;
+    },
+    [] as string[],
+  )
+  .option('--transitive-risk <text>', 'Free-text note about transitive dependency risk')
+  .action(
+    action(
+      'facts add failed',
+      async (
+        pkg: string,
+        opts: {
+          license: string;
+          status: string;
+          ecosystem: string;
+          licenseRisk: string;
+          vuln: string[];
+          transitiveRisk?: string;
+        },
+      ) => {
+        // A thrown Error here (bad enum / bad --vuln) → fail() → stderr + exit 1.
+        const overlay = buildL2FromInput({
+          package: pkg,
+          license: opts.license,
+          status: opts.status,
+          ecosystem: opts.ecosystem,
+          licenseRisk: opts.licenseRisk,
+          transitiveRisk: opts.transitiveRisk,
+          vulns: opts.vuln,
+        });
+
+        const envPath = process.env.STARLOG_PRIVATE_FACTS;
+        const path = envPath ?? DEFAULT_PRIVATE_FACTS;
+        const existing = readJsonIfPresent(path); // SyntaxError throws → no clobber
+        const merged = upsertL2Entry(existing as { l1?: unknown[]; l2?: unknown[] } | null, overlay);
+        // Unwritable path → EACCES → fail() prints the permission-denied message (AUTH-04).
+        await atomicWrite(path, JSON.stringify(merged, null, 2) + '\n');
+
+        await track(
+          'cli_facts_add',
+          { ecosystem: overlay.ecosystem, has_vulns: overlay.known_vulns.length > 0, default_path: !envPath },
+          { noTelemetry: noTelemetry() },
+        );
+
+        console.log(`Added ${pkg} to ${path}.`);
+        if (envPath) {
+          console.log(`Your agent already reads this file (STARLOG_PRIVATE_FACTS). Vet it now: starlog facts ${pkg}`);
+        } else {
+          console.log(`To have your agent read it, set:  export STARLOG_PRIVATE_FACTS=${path}`);
+          console.log(`Then vet it: STARLOG_PRIVATE_FACTS=${path} starlog facts ${pkg}`);
+        }
+      },
+    ),
+  );
+
+// `starlog facts policy <package> <verdict>` — set an org allow/deny/flag
+// verdict LOCALLY (writes/upserts an L3 rule). The verdict renders in
+// `facts <pkg>` only when the package also has an L1/L2 record (AUTH-03).
+facts
+  .command('policy <package> <verdict>')
+  .description('Set an org allow/deny/flag verdict for a package (writes an L3 policy rule)')
+  .option('--reason <text>', 'Rationale recorded with the verdict')
+  .action(
+    action('facts policy failed', async (pkg: string, verdict: string, opts: { reason?: string }) => {
+      // Bad verdict throws "Invalid verdict ..." → fail() → exit 1.
+      const rule = buildL3Rule(pkg, verdict, opts.reason);
+
+      const envPath = process.env.STARLOG_POLICY;
+      const path = envPath ?? DEFAULT_POLICY;
+      const existing = readJsonIfPresent(path); // SyntaxError throws → no clobber
+      const policy = upsertPolicy(existing as { org?: string; rules?: unknown[] } | null, rule);
+      await atomicWrite(path, JSON.stringify(policy, null, 2) + '\n');
+
+      await track(
+        'cli_facts_policy',
+        { decision: rule.decision, default_path: !envPath },
+        { noTelemetry: noTelemetry() },
+      );
+
+      console.log(`Set org verdict ${verdict.toUpperCase()} for ${pkg} in ${path}.`);
+      if (envPath) {
+        console.log(`Your agent already reads this policy (STARLOG_POLICY). Vet it now: starlog facts ${pkg}`);
+      } else {
+        console.log(`To have your agent apply it, set:  export STARLOG_POLICY=${path}`);
+        console.log(`Then vet it: STARLOG_POLICY=${path} starlog facts ${pkg}`);
+      }
+    }),
+  );
 
 // `starlog facts push [file]` — upload the org's private L2 overlays (+ optional
 // L3 policy) to the hosted facts API. File shape: { "l2": [L2Overlay...], "policy": L3Policy? }.
