@@ -55,7 +55,7 @@ const program = new Command();
 program
   .name('starlog')
   .version(getPackageVersion())
-  .description('Capability indexing layer for AI coding agents')
+  .description('Vet a package before you use it: authoritative facts (CVEs, license, maintenance, capability) for your AI coding agent. Run "starlog facts <package>" to look one up.')
   .option('--no-telemetry', 'Disable anonymous usage telemetry for this run');
 
 /** True when the user passed --no-telemetry. */
@@ -63,7 +63,7 @@ const noTelemetry = () => program.opts().telemetry === false;
 
 program
   .command('search')
-  .description('Search capability manifests for library recommendations')
+  .description('Discover candidate packages for a capability (org-sanctioned ones first when configured), then vet the named pick with "starlog facts <package>"')
   .argument('<query>', 'Natural language query (e.g., "auth for Next.js")')
   .option('--format <type>', 'Output format: json or table', 'table')
   .option('--category <cat>', 'Filter by category')
@@ -184,7 +184,7 @@ program
 
 const facts = program
   .command('facts')
-  .description("Look up package facts, or push your org's facts to the hosted API");
+  .description("Vet a package by name — authoritative facts (CVEs, license, maintenance, capability), or push your org's facts to the hosted API");
 
 // `starlog facts <package>` keeps working via this default subcommand.
 facts
