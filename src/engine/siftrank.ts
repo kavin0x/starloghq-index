@@ -1,86 +1,4 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { writeFile, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
-import type { CapabilityManifest } from '../manifest/schema.js';
-import type { SiftrankFn, SiftrankResult, LlmFn } from './types.js';
-
-const execFileAsync = promisify(execFile);
-
-// Resolve siftrank binary -- check GOPATH/bin first, then fall back to PATH
-function getSiftrankPath(): string {
-  const gopath = process.env.GOPATH || join(process.env.HOME || '', 'go');
-  return join(gopath, 'bin', 'siftrank');
-}
-
-/**
- * siftrank's `key` field is a generated short hash, NOT our manifest id -- the
- * original manifest is preserved in `object`. search() maps results back to the
- * corpus by `key` against manifest ids, so without this re-keying every
- * semantic result fails to map and the search returns empty. Re-point `key` to
- * `object.id` so the rest of the pipeline matches. Exported for unit testing.
- */
-export function rekeyByObjectId(results: SiftrankResult[]): SiftrankResult[] {
-  return results.map((r) => {
-    // siftrank preserves the original input object so we can map back to it.
-    // The current binary names that field `document`; older docs call it
-    // `object`. Check both, then re-point `key` to the manifest id.
-    const rec = r as unknown as { document?: { id?: unknown }; object?: { id?: unknown } };
-    const id = rec.document?.id ?? rec.object?.id;
-    return typeof id === 'string' ? { ...r, key: id } : r;
-  });
-}
-
-/**
- * Create a SiftrankFn that spawns the siftrank Go binary.
- *
- * Maps OPENROUTER_API_KEY to OPENAI_API_KEY and uses --base-url
- * to route through OpenRouter. Uses anthropic/claude-haiku-4.5 for
- * cost efficiency.
- */
-export function createSiftrankFn(): SiftrankFn {
-  return async (manifests: CapabilityManifest[], query: string): Promise<SiftrankResult[]> => {
-    if (manifests.length === 0) return [];
-
-    const tmpFile = join(tmpdir(), `siftrank-${randomUUID()}.json`);
-
-    try {
-      // Write manifests to temp file
-      await writeFile(tmpFile, JSON.stringify(manifests), 'utf-8');
-
-      const args = [
-        '--file', tmpFile,
-        '--json',
-        '--prompt', query,
-        '--model', process.env.STARLOG_RANK_MODEL || 'anthropic/claude-haiku-4.5',
-        '--base-url', 'https://openrouter.ai/api/v1',
-        '--batch-size', '10',
-        '--template', '{{ .name }}: {{ .solves }} | Best for: {{ range .best_for }}{{ . }}, {{ end }}',
-      ];
-
-      const env = {
-        ...process.env,
-        OPENAI_API_KEY: process.env.OPENROUTER_API_KEY,
-      };
-
-      const { stdout } = await execFileAsync(getSiftrankPath(), args, {
-        env,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-      });
-
-      const parsed: SiftrankResult[] = JSON.parse(stdout);
-      // Order by siftrank's authoritative `rank` (1 = best). siftrank's own
-      // `score` is "lower = better" (mean position), the opposite of this
-      // pipeline's convention, so it must NOT be used for ordering downstream.
-      return rekeyByObjectId(parsed).sort((a, b) => a.rank - b.rank);
-    } finally {
-      // Clean up temp file
-      await unlink(tmpFile).catch(() => {});
-    }
-  };
-}
+import type { SiftrankFn, LlmFn } from './types.js';
 
 // Filler words that carry no ranking signal in a capability query. Kept small
 // and dev-flavored: terms like "build", "app", or "using" match nearly every
@@ -147,8 +65,8 @@ const FIELD_WEIGHTS: Array<['name' | 'category' | 'solves' | 'best_for' | 'stack
 ];
 
 /**
- * Keyword fallback ranker -- used when the siftrank binary / OPENROUTER_API_KEY
- * is unavailable. Exported for direct unit testing.
+ * The keyword ranker -- the default and only ranking path. Exported for direct
+ * unit testing and consumed by runSearch.
  *
  * Scoring, term by term: inverse-document-frequency (distinctive terms like
  * "auth" outweigh corpus-common ones) times a field-weighted sum of match
@@ -241,77 +159,6 @@ export const keywordSiftrank: SiftrankFn = async (manifests, query) => {
     .sort((a, b) => b.score - a.score)
     .map(({ onTopic: _onTopic, ...r }, i) => ({ ...r, rank: i + 1 }));
 };
-
-// Emit the fallback notice at most once per process. stderr only -- stdout
-// carries the CLI's search output and the MCP stdio protocol.
-let warnedFallback = false;
-
-function warnFallback(message: string): void {
-  if (warnedFallback) return;
-  warnedFallback = true;
-  console.error(message);
-}
-
-/**
- * The ranker the CLI and MCP server both use. Retrieve-then-rerank:
- *
- *   1. The validated keyword ranker RETRIEVES the relevant set -- it applies the
- *      relevance floor + on-topic filter, so it decides *which* manifests are
- *      relevant and returns nothing for out-of-corpus queries.
- *   2. siftrank, when configured (binary + key), only REORDERS that set. It
- *      never widens it, so the off-topic tail can't appear and the out-of-domain
- *      protection carries into semantic mode for free.
- *
- * If siftrank is absent (the default) or errors, the keyword order stands. This
- * keeps semantic ranking strictly additive: it can refine the order but never
- * makes results worse than the keyword baseline. (Semantic reranking quality is
- * not yet independently validated -- treated as experimental.)
- */
-export function createResilientSiftrankFn(): SiftrankFn {
-  const real = createSiftrankFn();
-  return async (manifests, query) => {
-    const eligible = await keywordSiftrank(manifests, query);
-    if (eligible.length === 0) return []; // out-of-corpus: nothing to rank
-
-    const eligibleIds = new Set(eligible.map((r) => r.key));
-    const subset = manifests.filter((m) => eligibleIds.has(m.id));
-
-    try {
-      const ranked = await real(subset, query);
-      const ordered = ranked.filter((r) => eligibleIds.has(r.key));
-      if (ordered.length === 0) {
-        warnFallback('[starlog] siftrank returned no usable ranking; using keyword order. Run `starlog doctor`.');
-        return eligible;
-      }
-      // Present siftrank's order with the keyword relevance magnitudes assigned
-      // highest-first, so the score column stays monotonic instead of exposing
-      // siftrank's inverted internal score.
-      const scoresDesc = eligible.map((r) => r.score).sort((a, b) => b - a);
-      const fallbackScore = scoresDesc[scoresDesc.length - 1] ?? 0;
-      return ordered.map((r, i) => ({ ...r, score: scoresDesc[i] ?? fallbackScore, rank: i + 1 }));
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      if (/ENOENT/.test(raw)) {
-        // No siftrank binary -- the ordinary default. Keyword ranking is the
-        // first-class mode; point to `doctor` for the (experimental) upgrade.
-        warnFallback(
-          '[starlog] Using keyword ranking (offline default). ' +
-          'For experimental semantic ranking, run: starlog doctor',
-        );
-      } else {
-        // Binary present but errored. Don't leak the command/temp path -- just
-        // the exit code and a pointer to `doctor`.
-        const e = err as { code?: number | string };
-        const exit = typeof e.code === 'number' ? ` (exit ${e.code})` : '';
-        warnFallback(
-          `[starlog] siftrank failed${exit}; using keyword ranking instead. ` +
-          'Run `starlog doctor` to check your ranking setup.',
-        );
-      }
-      return eligible;
-    }
-  };
-}
 
 /**
  * Create an LlmFn that uses the Anthropic SDK via OpenRouter.
