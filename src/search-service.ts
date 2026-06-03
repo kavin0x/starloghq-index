@@ -1,7 +1,8 @@
 import { loadCorpus } from './engine/corpus.js';
+import { loadPrivateCorpus } from './engine/private-corpus.js';
 import { search } from './engine/search.js';
 import { keywordSiftrank, createLlmFn } from './engine/siftrank.js';
-import { type Category, type QueryResult } from './manifest/schema.js';
+import { type CapabilityManifest, type Category, type QueryResult } from './manifest/schema.js';
 
 export interface SearchArgs {
   query: string;
@@ -24,15 +25,33 @@ export async function runSearch(args: SearchArgs): Promise<QueryResult[]> {
   const { query, category, stack, top_k, diversity_lambda, context } = args;
 
   const corpus = await loadCorpus(undefined, category as Category | undefined);
+
+  // FACTS-03 discovery overlay: load the org's private manifests from
+  // STARLOG_PRIVATE_CORPUS (mirror of STARLOG_PRIVATE_FACTS). This is the ONLY
+  // place env is read for the corpus overlay — CLI and MCP both call runSearch,
+  // so both transports get private-first for free. Empty when env unset/degraded.
+  const priv = loadPrivateCorpus(process.env.STARLOG_PRIVATE_CORPUS);
+
+  // Merge private manifests into the searched corpus, private WINS on id
+  // collision (mirrors the "private wins per layer" semantics of buildComposeDeps).
+  const byId = new Map<string, CapabilityManifest>();
+  for (const m of corpus) byId.set(m.id, m);
+  for (const m of priv) byId.set(m.id, m);
+  const mergedCorpus = [...byId.values()];
+
+  // Ids to float first (org-sanctioned). search() applies the relevance guard.
+  const privateIds = new Set(priv.map((m) => m.id));
+
   return search(
     query,
-    corpus,
+    mergedCorpus,
     {
       category: category as Category | undefined,
       stack,
       topK: top_k ?? 5,
       projectContext: context,
       diversityLambda: diversity_lambda,
+      privateIds,
     },
     { siftrank: keywordSiftrank, llm: createLlmFn() },
   );
