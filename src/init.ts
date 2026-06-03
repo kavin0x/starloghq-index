@@ -678,19 +678,12 @@ function isEphemeralInstall(): boolean {
 }
 
 /** Post-install guidance: what's active, what to do next, and any caveats. */
-function printPostInstallSummary(apiKey?: string): void {
+function printPostInstallSummary(): void {
   console.log('\nDone! Next steps:');
   console.log('  1. Restart your AI coding agent so it loads the MCP server.');
   console.log('  2. Run `starlog doctor` to confirm everything is wired up.');
 
-  const ranking = apiKey
-    ? 'hosted semantic via STARLOG_API_KEY (wired into the MCP server) — experimental'
-    : 'keyword — offline, no key (the default)';
-  console.log(`\nRanking mode: ${ranking}.`);
-  if (!apiKey) {
-    console.log('  Keyword needs no setup. For experimental semantic ranking, re-run with');
-    console.log('  `--api-key <key>` (get one at https://api.starlog.dev/auth/github).');
-  }
+  console.log('\nRanking mode: keyword — offline, no key, no setup (the default).');
 
   console.log('\nThe `starlog_search` tool runs in Claude Code; Cursor, Copilot, and Codex');
   console.log('get instruction files. The `starlog` CLI works in any terminal.');
@@ -757,7 +750,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
 
   if (changes.length === 0) {
     console.log('\nEverything is already configured. No changes needed.');
-    printPostInstallSummary(apiKey);
+    printPostInstallSummary();
     return;
   }
 
@@ -792,5 +785,5 @@ export async function runInit(opts: InitOpts): Promise<void> {
     await item.apply();
     console.log(`  [done] ${item.label}`);
   }
-  printPostInstallSummary(apiKey);
+  printPostInstallSummary();
 }
