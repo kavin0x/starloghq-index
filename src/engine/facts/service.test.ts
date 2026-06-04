@@ -7,12 +7,11 @@ import { L1_FACTS } from './l1-data.js';
 
 const KEYS = L1_FACTS.map((f) => f.package); // corpus order
 
-describe('resolvePackage — matcher semantics & regression guards', () => {
-  it('exact / query-contains-pkg / pkg-contains-query / case / whitespace', () => {
+describe('resolvePackage — EXACT-ONLY matcher semantics & regression guards', () => {
+  it('exact name resolves; normalization (case + surrounding whitespace) is the only tolerance', () => {
     expect(resolvePackage('chalk', KEYS)).toBe('chalk');
-    expect(resolvePackage('should I use moment for dates', KEYS)).toBe('moment');
-    expect(resolvePackage('xz', KEYS)).toBe('xz-utils');
     expect(resolvePackage('\t  GRAFANA \n', KEYS)).toBe('grafana');
+    expect(resolvePackage('xz-utils', KEYS)).toBe('xz-utils'); // exact full name, not the "xz" abbrev
   });
 
   it('empty/whitespace query and genuine miss → null', () => {
@@ -30,30 +29,24 @@ describe('resolvePackage — matcher semantics & regression guards', () => {
     expect(resolvePackage('chalk', ['   ', 'chalk'])).toBe('chalk');
   });
 
-  it('first-match-wins by key order in the loose pass (token-valid inputs)', () => {
-    // "auth" is a contiguous token-run of both keys → first by order wins.
-    expect(resolvePackage('auth', ['auth-helper', 'auth-core'])).toBe('auth-helper');
-    expect(resolvePackage('auth', ['auth-core', 'auth-helper'])).toBe('auth-core');
+  it('REGRESSION: NO fabrication — a non-exact query never returns another package', () => {
+    // Vetting is by-NAME (`starlog_facts` takes `package`); NL/capability discovery
+    // is `starlog_search`'s job. So fuzzy/substring/token matching is gone — every
+    // one of these is a DIFFERENT package than any key and must miss honestly.
+    expect(resolvePackage('@starloghq/facts-schema', ['q', 'express', 'chalk'])).toBeNull(); // scope contained "q"
+    expect(resolvePackage('express-rate-limit', ['express'])).toBeNull();   // "express" was a leading token
+    expect(resolvePackage('express rate limit', ['express'])).toBeNull();   // same class, whitespace form
+    expect(resolvePackage('lodash.merge', ['lodash'])).toBeNull();          // ".merge" is a different pkg
+    expect(resolvePackage('expres', ['express'])).toBeNull();               // typo, not a fuzzy hit
+    expect(resolvePackage('should I use moment for dates', ['moment'])).toBeNull(); // NL → use search, not facts
   });
 
-  it('REGRESSION: token-boundary, not char-substring — never fabricate a wrong package', () => {
-    // The bug this fix closes: a scoped/internal name char-substring-matched an
-    // unrelated public key ("@starloghq/facts-schema" → "q", because "starloghq"
-    // contains the char "q"). Tokenizing kills it: "q" is not a token of
-    // [starloghq, facts, schema]. Honest absence instead of a fabricated answer.
-    expect(resolvePackage('@starloghq/facts-schema', ['q', 'express', 'chalk'])).toBeNull();
-    // A typo is a miss, not a silent fuzzy hit on a real package.
-    expect(resolvePackage('expres', ['express'])).toBeNull();
-    // ...but a real abbreviation (whole token) still resolves.
-    expect(resolvePackage('xz', ['xz-utils'])).toBe('xz-utils');
-  });
-
-  it('REGRESSION: EXACT always beats LOOSE, regardless of key order', () => {
-    // The hero failure mode: a public single-token key ("auth") scanned BEFORE
-    // an org's exact scoped key ("@acme/auth") must NOT shadow it. Pass-1 exact
-    // wins over pass-2 token-loose even though "auth" appears first.
+  it('REGRESSION: an org-private exact name resolves even when a public key could have loose-matched', () => {
+    // The hero failure mode: public "auth" must never shadow org "@acme/auth".
+    // Under exact-only this is automatic — only the exact key can match.
     expect(resolvePackage('@acme/auth', ['auth', '@acme/auth'])).toBe('@acme/auth');
     expect(resolvePackage('@acme/auth', ['@acme/auth', 'auth'])).toBe('@acme/auth');
+    expect(resolvePackage('auth', ['auth', '@acme/auth'])).toBe('auth'); // a bare "auth" query still hits the public key exactly
   });
 });
 
