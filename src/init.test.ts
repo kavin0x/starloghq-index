@@ -106,8 +106,8 @@ describe('upsertMarkedSection() + removeMarkedSection()', () => {
     // Simulate drift: user appends content, and the section body gets stale.
     const installed = await readFile(target, 'utf8');
     const staleBody = installed.replace(
-      'ALWAYS consult',
-      'OUTDATED please ignore — ALWAYS consult',
+      'vet it with',
+      'OUTDATED please ignore — vet it with',
     );
     await writeFile(target, staleBody + '\n# User notes\nKeep me.\n');
 
@@ -116,7 +116,7 @@ describe('upsertMarkedSection() + removeMarkedSection()', () => {
 
     const result = await readFile(target, 'utf8');
     expect(result).not.toContain('OUTDATED please ignore'); // stale body replaced
-    expect(result).toContain('ALWAYS consult');             // current body present
+    expect(result).toContain('vet it with');                // current body present
     expect(result).toContain('# Title');                    // content before preserved
     expect(result).toContain('Keep me.');                   // content after preserved
     // Exactly one section remains (no duplication).
@@ -178,7 +178,7 @@ describe('markedSectionAction() — preview parity with upsertMarkedSection (ini
   it('predicts "update" for a drifted bounded section', async () => {
     const target = join(tmpRoot, 'CLAUDE.md');
     await upsertMarkedSection(target);
-    const stale = (await readFile(target, 'utf8')).replace('ALWAYS consult', 'STALE — ALWAYS consult');
+    const stale = (await readFile(target, 'utf8')).replace('vet it with', 'STALE — vet it with');
     await writeFile(target, stale);
     await assertParity(target, 'update');
   });
@@ -187,5 +187,22 @@ describe('markedSectionAction() — preview parity with upsertMarkedSection (ini
     const target = join(tmpRoot, 'CLAUDE.md');
     await writeFile(target, '# Title\n\n<!-- starlog:init -->\n## Starlog — Capability Search\n\nold\n');
     await assertParity(target, 'unchanged');
+  });
+});
+
+describe('facts-first onboarding text (D-01/D-02/D-04)', () => {
+  it('marked section is facts-first (starlog_facts hero, no stale search-first copy)', async () => {
+    const target = join(tmpRoot, 'CLAUDE.md');
+    await upsertMarkedSection(target);
+    const written = await readFile(target, 'utf8');
+
+    // The instruction injected into every harness leads with starlog_facts.
+    expect(written).toContain('starlog_facts');
+    expect(written).toContain('vet packages before you use them'); // facts-first header
+    expect(written).toContain('vet it with');                      // stable body substring
+
+    // The stale search-first copy is gone.
+    expect(written).not.toContain('ALWAYS consult');
+    expect(written).not.toContain('## Starlog — Capability Search');
   });
 });
