@@ -374,7 +374,13 @@ describe('starlog facts authoring (add / policy) e2e', () => {
     // relative default resolves under tmpDir.
     const add = runFactsInDir(dir, ['add', '@acme/unset', '--license', 'MIT', '--status', 'active']);
     expect(add.status).toBe(0);
-    expect(add.stdout).toContain('export STARLOG_PRIVATE_FACTS=');
+    // Nudge is accurate about the agent path: the agent auto-reads the default
+    // .starlog file after `starlog init` (the MCP server's baked env), and the
+    // inline-env form is for CLI use in this shell. A shell `export` never reaches
+    // the agent-spawned server, so we no longer tell users to do that.
+    expect(add.stdout).toContain('starlog init');
+    expect(add.stdout).toContain('STARLOG_PRIVATE_FACTS=');
+    expect(add.stdout).not.toContain('export STARLOG_PRIVATE_FACTS=');
 
     const defaultPath = join(dir, '.starlog', 'private-facts.json');
     const parsed = JSON.parse(readFileSync(defaultPath, 'utf8'));

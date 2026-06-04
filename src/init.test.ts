@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readFile, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { upsertMarkedSection, removeMarkedSection, markedSectionAction } from './init.js';
+import { upsertMarkedSection, removeMarkedSection, markedSectionAction, desiredMcpServer } from './init.js';
 
 let tmpRoot: string;
 
@@ -204,5 +204,27 @@ describe('facts-first onboarding text (D-01/D-02/D-04)', () => {
     // The stale search-first copy is gone.
     expect(written).not.toContain('ALWAYS consult');
     expect(written).not.toContain('## Starlog — Capability Search');
+  });
+});
+
+describe('desiredMcpServer — per-project private overlays baked into the agent server', () => {
+  it('bakes CLAUDE_PROJECT_DIR-relative paths for facts, corpus, and policy (the agent never inherits the shell)', () => {
+    const env = desiredMcpServer().env;
+    // Resolves per-project at runtime via Claude Code's ${CLAUDE_PROJECT_DIR}
+    // expansion — one global entry, no cross-project leak, no cwd dependency.
+    expect(env.STARLOG_PRIVATE_FACTS).toBe('${CLAUDE_PROJECT_DIR}/.starlog/private-facts.json');
+    expect(env.STARLOG_PRIVATE_CORPUS).toBe('${CLAUDE_PROJECT_DIR}/.starlog/private-corpus.json');
+    expect(env.STARLOG_POLICY).toBe('${CLAUDE_PROJECT_DIR}/.starlog/policy.json');
+  });
+
+  it('omits the hosted key unless provided, and bakes it when given', () => {
+    expect(desiredMcpServer().env.STARLOG_API_KEY).toBeUndefined();
+    expect(desiredMcpServer('sk-test-123').env.STARLOG_API_KEY).toBe('sk-test-123');
+  });
+
+  it('still points at the shipped server entrypoint', () => {
+    const e = desiredMcpServer();
+    expect(e.command).toBe('node');
+    expect(e.args[0]).toMatch(/dist[/\\]mcp\.js$/);
   });
 });

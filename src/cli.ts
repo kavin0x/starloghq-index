@@ -309,11 +309,12 @@ facts
         );
 
         console.log(`Added ${pkg} to ${path}.`);
-        if (envPath) {
-          console.log(`Your agent already reads this file (STARLOG_PRIVATE_FACTS). Vet it now: starlog facts ${pkg}`);
+        if (path === DEFAULT_PRIVATE_FACTS) {
+          console.log(`Your coding agent reads this automatically, per-project, after \`starlog init\` (no shell export needed).`);
+          console.log(`Vet it from this shell: STARLOG_PRIVATE_FACTS=${path} starlog facts ${pkg}`);
         } else {
-          console.log(`To have your agent read it, set:  export STARLOG_PRIVATE_FACTS=${path}`);
-          console.log(`Then vet it: STARLOG_PRIVATE_FACTS=${path} starlog facts ${pkg}`);
+          console.log(`Note: \`starlog init\` wires the agent to the default ${DEFAULT_PRIVATE_FACTS}; a custom path is read by the CLI only.`);
+          console.log(`Vet it: STARLOG_PRIVATE_FACTS=${path} starlog facts ${pkg}`);
         }
       },
     ),
@@ -484,11 +485,12 @@ corpus
         );
 
         console.log(`Added ${pkg} to ${path} (discovery).`);
-        if (envPath) {
-          console.log(`Your agent already discovers via this file (STARLOG_PRIVATE_CORPUS). Find it: starlog search "${manifest.solves}"`);
+        if (path === DEFAULT_PRIVATE_CORPUS) {
+          console.log(`Your coding agent's search surfaces this automatically, per-project, after \`starlog init\` (no shell export needed).`);
+          console.log(`Try it from this shell: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);
         } else {
-          console.log(`To have search surface it, set:  export STARLOG_PRIVATE_CORPUS=${path}`);
-          console.log(`Then discover it: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);
+          console.log(`Note: \`starlog init\` wires the agent to the default ${DEFAULT_PRIVATE_CORPUS}; a custom path is searched by the CLI only.`);
+          console.log(`Try it: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);
         }
         console.log(`Tip: also vet it — starlog facts add ${pkg} --status active --license ${opts.license ?? '<spdx>'}`);
       },
