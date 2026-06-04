@@ -30,9 +30,30 @@ describe('resolvePackage — matcher semantics & regression guards', () => {
     expect(resolvePackage('chalk', ['   ', 'chalk'])).toBe('chalk');
   });
 
-  it('first-match-wins by key order (insertion-order precedence)', () => {
-    expect(resolvePackage('a', ['alpha', 'beta'])).toBe('alpha');
-    expect(resolvePackage('a', ['beta', 'alpha'])).toBe('beta');
+  it('first-match-wins by key order in the loose pass (token-valid inputs)', () => {
+    // "auth" is a contiguous token-run of both keys → first by order wins.
+    expect(resolvePackage('auth', ['auth-helper', 'auth-core'])).toBe('auth-helper');
+    expect(resolvePackage('auth', ['auth-core', 'auth-helper'])).toBe('auth-core');
+  });
+
+  it('REGRESSION: token-boundary, not char-substring — never fabricate a wrong package', () => {
+    // The bug this fix closes: a scoped/internal name char-substring-matched an
+    // unrelated public key ("@starloghq/facts-schema" → "q", because "starloghq"
+    // contains the char "q"). Tokenizing kills it: "q" is not a token of
+    // [starloghq, facts, schema]. Honest absence instead of a fabricated answer.
+    expect(resolvePackage('@starloghq/facts-schema', ['q', 'express', 'chalk'])).toBeNull();
+    // A typo is a miss, not a silent fuzzy hit on a real package.
+    expect(resolvePackage('expres', ['express'])).toBeNull();
+    // ...but a real abbreviation (whole token) still resolves.
+    expect(resolvePackage('xz', ['xz-utils'])).toBe('xz-utils');
+  });
+
+  it('REGRESSION: EXACT always beats LOOSE, regardless of key order', () => {
+    // The hero failure mode: a public single-token key ("auth") scanned BEFORE
+    // an org's exact scoped key ("@acme/auth") must NOT shadow it. Pass-1 exact
+    // wins over pass-2 token-loose even though "auth" appears first.
+    expect(resolvePackage('@acme/auth', ['auth', '@acme/auth'])).toBe('@acme/auth');
+    expect(resolvePackage('@acme/auth', ['@acme/auth', 'auth'])).toBe('@acme/auth');
   });
 });
 
