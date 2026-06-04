@@ -119,6 +119,25 @@ try {
   CORPUS_DIR = ${JSON.stringify(join(getPackageRoot(), 'corpus-free'))};
 }
 
+// L2 facts map (generated from l2-data.ts). Resolved the same dual way as
+// CORPUS_DIR so the hook surfaces facts whether installed as a dep or run in-repo.
+let L2_FACTS_PATH;
+try {
+  L2_FACTS_PATH = require('path').join(
+    require('path').dirname(require.resolve('starloghq/package.json')),
+    'corpus-free', 'l2-facts.json'
+  );
+} catch {
+  L2_FACTS_PATH = ${JSON.stringify(join(getPackageRoot(), 'corpus-free', 'l2-facts.json'))};
+}
+function loadL2Facts() {
+  try { return JSON.parse(fs.readFileSync(L2_FACTS_PATH, 'utf8')); } catch (e) { return {}; }
+}
+function lookupL2(rawPkg, normId) {
+  var facts = loadL2Facts();
+  return facts[rawPkg] || facts[normId] || null;
+}
+
 let input = '';
 const stdinTimeout = setTimeout(() => process.exit(0), 3000);
 process.stdin.setEncoding('utf8');
@@ -154,18 +173,30 @@ process.stdin.on('end', () => {
       var originalPkg = rawPkgs[i];
       var pkg = normalizeToManifestId(originalPkg);
       const manifestPath = findManifest(pkg) || findManifest(pkg.replace(/-/g, ''));
-      if (manifestPath) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        const skipItems = (manifest.skip_when || [])
-          .map(s => '  - ' + s).join('\\n');
-        const alts = (manifest.alternative_ids || []).slice(0, 3).join(', ');
-        console.log(
-          '[Starlog] Found manifest for "' + manifest.name + '".\\n' +
-          'Skip when:\\n' + skipItems + '\\n' +
-          (alts ? 'Alternatives: ' + alts + '\\n' : '') +
-          'Run starlog_search for full analysis.'
-        );
+
+      // Surface FACTS for the just-installed package, looked up by name
+      // independently of whether a corpus-free manifest exists. Exactly one
+      // hookSpecificOutput per detected package (advisory; never fails).
+      var l2 = lookupL2(originalPkg, pkg);
+      var msg;
+      if (l2) {
+        var parts = [];
+        if (l2.known_vulns && l2.known_vulns.length) {
+          parts.push('KNOWN VULNS/INCIDENTS: ' + l2.known_vulns.map(function(v){ return v.id + ' [' + v.severity + '] ' + v.summary; }).join(' | '));
+        } else {
+          parts.push('No known vulns/incidents on file.');
+        }
+        parts.push('Maintenance: ' + l2.maintenance + '. License: ' + l2.license + ' (risk: ' + l2.license_risk + ').');
+        parts.push('As of ' + l2.fetched_at + '. Vet with starlog_facts ' + l2.package + ' before building on it.');
+        msg = '[Starlog facts] ' + originalPkg + ' — ' + parts.join(' ');
       } else {
+        msg = '[Starlog] No facts on file for "' + originalPkg + '". Run starlog_facts ' + originalPkg + ' to vet it.';
+      }
+      console.log(JSON.stringify({
+        hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: msg }
+      }));
+
+      if (!manifestPath) {
         // Queue for batch generation (per D-02, D-03)
         try {
           var homedir = require('os').homedir();
@@ -203,15 +234,8 @@ process.stdin.on('end', () => {
             fs.mkdirSync(localQueueDir, { recursive: true });
             writeFileAtomic(localQueuePath, JSON.stringify(localQueue, null, 2) + '\\n');
           }
-
-          // Output structured JSON for Claude context (per research recommendation)
-          var output = {
-            hookSpecificOutput: {
-              hookEventName: 'PostToolUse',
-              additionalContext: '[Starlog] No manifest for "' + originalPkg + '" -- queued for generation. It will be added to the index automatically.'
-            }
-          };
-          console.log(JSON.stringify(output));
+          // NB: the facts hookSpecificOutput was already emitted above for this
+          // package; the queue write is a silent side-effect (no second JSON on stdout).
         } catch (e) {
           // Never fail -- advisory only
         }
