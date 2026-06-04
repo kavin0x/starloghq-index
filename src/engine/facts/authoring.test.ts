@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { L2OverlaySchema, L3RuleSchema } from '@starloghq/facts-schema';
+import { CapabilityManifestSchema } from '../../manifest/schema.js';
 import {
   buildL2FromInput,
   parseVulnFlag,
   upsertL2Entry,
+  buildManifestFromInput,
+  upsertManifestEntry,
   buildL3Rule,
   ruleIdFor,
   upsertPolicy,
@@ -185,5 +188,82 @@ describe('buildL3Rule + upsertPolicy (AUTH-03 authoring)', () => {
     const upserted = result.rules.find((r) => r.id === 'pkg-@acme/x');
     expect(upserted?.decision).toBe('deny');
     expect(upserted?.rationale).toBe('new reason');
+  });
+});
+
+describe('buildManifestFromInput — DISCOVERY authoring (defaults + errors)', () => {
+  it('minimal { package, solves } produces a manifest that passes CapabilityManifestSchema', () => {
+    const m = buildManifestFromInput({ package: '@acme/flags', solves: 'Feature flags for Acme services' });
+    expect(CapabilityManifestSchema.safeParse(m).success).toBe(true);
+  });
+
+  it('fills documented defaults (id=name=package, npm, moderate, null repo, neutral signals)', () => {
+    const m = buildManifestFromInput({ package: '@acme/flags', solves: 'Feature flags' });
+    expect(m.id).toBe('@acme/flags');
+    expect(m.name).toBe('@acme/flags');
+    expect(m.repo).toBeNull();
+    expect(m.ecosystem).toBe('npm');
+    expect(m.category).toBe('other');
+    expect(m.integration_effort).toBe('moderate');
+    expect(m.stack_affinity).toEqual([]);
+    expect(m.best_for).toEqual([]);
+    expect(m.hosted_alternative).toBeNull();
+    expect(m.quality.maintenance_status).toBe('active');
+    expect(m.health.stars).toBe(0);
+  });
+
+  it('carries through the discovery-relevant fields verbatim', () => {
+    const m = buildManifestFromInput({
+      package: '@acme/flags',
+      solves: 'Feature flags and remote config',
+      name: 'Acme Flags',
+      category: 'feature-flags',
+      stack: ['node', 'next.js'],
+      bestFor: ['gradual rollout', 'kill switches'],
+      skipWhen: ['static config'],
+      effort: 'easy',
+      ecosystem: 'both',
+      repo: 'acme/flags',
+      license: 'MIT',
+    });
+    expect(m.name).toBe('Acme Flags');
+    expect(m.category).toBe('feature-flags');
+    expect(m.stack_affinity).toEqual(['node', 'next.js']);
+    expect(m.best_for).toEqual(['gradual rollout', 'kill switches']);
+    expect(m.integration_effort).toBe('easy');
+    expect(m.ecosystem).toBe('both');
+    expect(m.repo).toBe('acme/flags');
+    expect(m.health.license).toBe('MIT');
+  });
+
+  it('throws an actionable error when --solves is missing or blank (not discoverable)', () => {
+    expect(() => buildManifestFromInput({ package: 'x' })).toThrow('--solves');
+    expect(() => buildManifestFromInput({ package: 'x', solves: '   ' })).toThrow('--solves');
+  });
+
+  it('throws "Invalid --effort" / "Invalid --ecosystem" listing the allowed values', () => {
+    expect(() => buildManifestFromInput({ package: 'x', solves: 's', effort: 'huge' })).toThrow('Invalid --effort');
+    expect(() => buildManifestFromInput({ package: 'x', solves: 's', ecosystem: 'cargo' })).toThrow('Invalid --ecosystem');
+  });
+});
+
+describe('upsertManifestEntry — { manifests } private-corpus shape', () => {
+  const mk = (id: string) => buildManifestFromInput({ package: id, solves: id + ' does things' });
+
+  it('creates { manifests: [m] } from an absent/empty/malformed file object', () => {
+    const m = mk('@acme/a');
+    expect(upsertManifestEntry(null, m)).toEqual({ manifests: [m] });
+    expect(upsertManifestEntry({}, m)).toEqual({ manifests: [m] });
+    expect(upsertManifestEntry(undefined, m)).toEqual({ manifests: [m] });
+  });
+
+  it('preserves other entries and upserts by id (re-run replaces, never duplicates)', () => {
+    const a = mk('@acme/a');
+    const bOld = mk('@acme/b');
+    const bNew = buildManifestFromInput({ package: '@acme/b', solves: 'updated', category: 'auth' });
+    const result = upsertManifestEntry({ manifests: [a, bOld] }, bNew);
+    expect(result.manifests).toHaveLength(2);
+    expect(result.manifests.find((m) => m.id === '@acme/a')).toEqual(a);
+    expect(result.manifests.find((m) => m.id === '@acme/b')?.category).toBe('auth');
   });
 });

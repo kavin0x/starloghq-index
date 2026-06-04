@@ -13,6 +13,8 @@ import {
   formatFactView,
   buildL2FromInput,
   upsertL2Entry,
+  buildManifestFromInput,
+  upsertManifestEntry,
   buildL3Rule,
   upsertPolicy,
   L2OverlaySchema,
@@ -404,6 +406,94 @@ facts
     await track('cli_facts_push', { l2_count: overlays.length, policy: pushedPolicy }, { noTelemetry: noTelemetry() });
     console.log(`Pushed ${res.count ?? overlays.length} L2 overlay(s)${pushedPolicy ? ' + org policy' : ''} to the hosted facts API.`);
   }));
+
+// ── corpus: org-private DISCOVERY authoring ───────────────────────────────────
+// Mirror of `facts add` for the OTHER private overlay: `facts add` makes an
+// internal package vettable (STARLOG_PRIVATE_FACTS); `corpus add` makes it
+// DISCOVERABLE (STARLOG_PRIVATE_CORPUS) so `search` surfaces it private-first.
+const DEFAULT_PRIVATE_CORPUS = '.starlog/private-corpus.json';
+
+/** commander value parser: "a, b ,c" → ['a','b','c'] (repeatable-free comma list). */
+function commaList(v: string): string[] {
+  return v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+const corpus = program
+  .command('corpus')
+  .description('Author org-private DISCOVERY entries so `search` surfaces your internal packages first');
+
+corpus
+  .command('add <package>')
+  .description('Make an internal package discoverable — `search` surfaces it (private-first) for a matching capability')
+  .requiredOption('--solves <text>', 'One line: what the package does (search matches capability queries against this)')
+  .option('--category <cat>', 'Capability category, free-form (e.g. feature-flags, authentication)', 'other')
+  .option('--stack <list>', 'Comma-separated stack affinity (e.g. node,next.js)', commaList, [] as string[])
+  .option('--best-for <list>', 'Comma-separated use cases', commaList, [] as string[])
+  .option('--skip-when <list>', 'Comma-separated anti-patterns', commaList, [] as string[])
+  .option('--effort <level>', 'drop-in | easy | moderate | significant | major', 'moderate')
+  .option('--ecosystem <eco>', 'npm | pypi | both', 'npm')
+  .option('--name <name>', 'Human-readable name (default: the package name)')
+  .option('--repo <owner/repo>', 'Source repo (default: none)')
+  .option('--license <spdx>', 'License id for the discovery card (default: UNLICENSED)')
+  .action(
+    action(
+      'corpus add failed',
+      async (
+        pkg: string,
+        opts: {
+          solves: string;
+          category: string;
+          stack: string[];
+          bestFor: string[];
+          skipWhen: string[];
+          effort: string;
+          ecosystem: string;
+          name?: string;
+          repo?: string;
+          license?: string;
+        },
+      ) => {
+        // A thrown Error here (missing --solves / bad enum) → fail() → stderr + exit 1.
+        const manifest = buildManifestFromInput({
+          package: pkg,
+          solves: opts.solves,
+          name: opts.name,
+          category: opts.category,
+          ecosystem: opts.ecosystem,
+          stack: opts.stack,
+          bestFor: opts.bestFor,
+          skipWhen: opts.skipWhen,
+          effort: opts.effort,
+          repo: opts.repo,
+          license: opts.license,
+        });
+
+        const envPath = process.env.STARLOG_PRIVATE_CORPUS;
+        const path = envPath ?? DEFAULT_PRIVATE_CORPUS;
+        const existing = readJsonIfPresent(path); // SyntaxError throws → no clobber
+        const merged = upsertManifestEntry(existing as { manifests?: unknown[] } | null, manifest);
+        await atomicWrite(path, JSON.stringify(merged, null, 2) + '\n');
+
+        await track(
+          'cli_corpus_add',
+          { ecosystem: manifest.ecosystem, default_path: !envPath },
+          { noTelemetry: noTelemetry() },
+        );
+
+        console.log(`Added ${pkg} to ${path} (discovery).`);
+        if (envPath) {
+          console.log(`Your agent already discovers via this file (STARLOG_PRIVATE_CORPUS). Find it: starlog search "${manifest.solves}"`);
+        } else {
+          console.log(`To have search surface it, set:  export STARLOG_PRIVATE_CORPUS=${path}`);
+          console.log(`Then discover it: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);
+        }
+        console.log(`Tip: also vet it — starlog facts add ${pkg} --status active --license ${opts.license ?? '<spdx>'}`);
+      },
+    ),
+  );
 
 program
   .command('telemetry')
