@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer, FACTS_TOOL_DESCRIPTION } from './mcp.js';
+import { buildManifestFromInput } from './engine/facts/authoring.js';
 
 /**
  * Integration test: the shipped MCP server registers BOTH starlog_search
@@ -66,6 +70,61 @@ describe('starlog MCP server — facts tool', () => {
     const result = await client.callTool({ name: 'starlog_facts', arguments: { package: 'no-such-pkg' } });
     const text = toolText(result).toLowerCase();
     expect(text).toContain('no facts on file');
+    await client.close();
+  });
+});
+
+/**
+ * The agent-spawn path, NOT the CLI. `starlog init` bakes
+ * STARLOG_PRIVATE_CORPUS=${CLAUDE_PROJECT_DIR}/.starlog/private-corpus.json into
+ * the MCP server's env; Claude Code expands it to an absolute project path and
+ * sets it in the spawned server's environment. Here we set that absolute path on
+ * process.env (the post-expansion state the server actually sees) and drive the
+ * REAL server tool over the MCP client — proving discovery wiring fires through
+ * the agent surface, not just the shell-inheriting CLI.
+ */
+describe('starlog MCP server — private discovery wiring (agent path)', () => {
+  let dir: string | null = null;
+  const saved = process.env.STARLOG_PRIVATE_CORPUS;
+  afterEach(() => {
+    if (dir) { rmSync(dir, { recursive: true, force: true }); dir = null; }
+    if (saved === undefined) delete process.env.STARLOG_PRIVATE_CORPUS;
+    else process.env.STARLOG_PRIVATE_CORPUS = saved;
+  });
+
+  function writeCorpus(): string {
+    dir = mkdtempSync(join(tmpdir(), 'starlog-mcp-corpus-'));
+    const manifest = buildManifestFromInput({
+      package: '@acme/flags',
+      solves: 'Feature flags and remote configuration for Acme Node services — gradual rollout, kill switches, audit log.',
+      category: 'feature-flags',
+      stack: ['node'],
+      bestFor: ['feature flags', 'remote config', 'gradual rollout', 'kill switches'],
+    });
+    const p = join(dir, 'private-corpus.json');
+    writeFileSync(p, JSON.stringify({ manifests: [manifest] }, null, 2), 'utf8');
+    return p;
+  }
+
+  it('starlog_search surfaces the org-private package when STARLOG_PRIVATE_CORPUS points at it (post-expansion)', async () => {
+    process.env.STARLOG_PRIVATE_CORPUS = writeCorpus();
+    const client = await connectClient();
+    const result = await client.callTool({
+      name: 'starlog_search',
+      arguments: { query: 'feature flags for a node app' },
+    });
+    expect(toolText(result)).toContain('@acme/flags');
+    await client.close();
+  });
+
+  it('without the env set, the same query does NOT surface the private package (proves the wiring is what did it)', async () => {
+    delete process.env.STARLOG_PRIVATE_CORPUS;
+    const client = await connectClient();
+    const result = await client.callTool({
+      name: 'starlog_search',
+      arguments: { query: 'feature flags for a node app' },
+    });
+    expect(toolText(result)).not.toContain('@acme/flags');
     await client.close();
   });
 });
