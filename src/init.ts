@@ -685,8 +685,10 @@ function printPostInstallSummary(): void {
 
   console.log('\nRanking mode: keyword — offline, no key, no setup (the default).');
 
-  console.log('\nThe `starlog_search` tool runs in Claude Code; Cursor, Copilot, and Codex');
-  console.log('get instruction files. The `starlog` CLI works in any terminal.');
+  console.log('\nYour agent will now vet packages with `starlog_facts` before adopting them.');
+  console.log('Try it now:  starlog facts <a package you already use>');
+  console.log('(e.g. `starlog facts axios`) — you get CVEs, license risk, and maintenance status.');
+  console.log('\nThe `starlog` CLI works in any terminal; Cursor, Copilot, and Codex get instruction files.');
 
   if (isEphemeralInstall()) {
     console.log('\n⚠  Heads up: this ran from a temporary npx cache, so the configured paths');
