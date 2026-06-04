@@ -256,6 +256,56 @@ async function checkRanker(): Promise<Check> {
   return { level: 'ok', label: 'Ranking', detail: rankingState().detail };
 }
 
+// ── Private overlays (vetting + discovery + policy) ──────────────────────────
+//
+// Two distinct things, both invisible without this check:
+//  1. Is the MCP server WIRED to read per-project overlays? (the baked
+//     STARLOG_PRIVATE_* env — absent on installs predating that wiring.)
+//  2. What has THIS project actually authored under `.starlog/`?
+const OVERLAY_FILES: Array<{ rel: string; key: string; label: string }> = [
+  { rel: '.starlog/private-facts.json', key: 'l2', label: 'vetting' },
+  { rel: '.starlog/private-corpus.json', key: 'manifests', label: 'discovery' },
+  { rel: '.starlog/policy.json', key: 'rules', label: 'policy' },
+];
+
+function mcpEnv(settings: Record<string, unknown> | null): Record<string, string> | null {
+  const servers = settings?.mcpServers as Record<string, { env?: Record<string, string> }> | undefined;
+  return servers?.starlog?.env ?? null;
+}
+
+export async function checkPrivateOverlays(settings: Record<string, unknown> | null, projectDir: string): Promise<Check[]> {
+  const checks: Check[] = [];
+
+  // 1. Wiring — only meaningful once the MCP server is configured at all.
+  if (resolveMcpCommand(settings)) {
+    const env = mcpEnv(settings);
+    const wired = !!(env?.STARLOG_PRIVATE_CORPUS && env?.STARLOG_PRIVATE_FACTS);
+    checks.push(
+      wired
+        ? { level: 'ok', label: 'Private overlays wired', detail: 'agent reads this project’s .starlog/ (vetting + discovery + policy)' }
+        : { level: 'warn', label: 'Private overlays wired', detail: 'MCP server has no overlay env — re-run `starlog init` so the agent reads private facts/discovery' },
+    );
+  }
+
+  // 2. What's authored in THIS project (counts, and a nudge when empty).
+  const found: string[] = [];
+  for (const { rel, key, label } of OVERLAY_FILES) {
+    const res = await readJson(join(projectDir, rel));
+    if (res.kind === 'ok') {
+      const arr = (res.data as Record<string, unknown>)[key];
+      found.push(`${label} ${Array.isArray(arr) ? arr.length : 0}`);
+    } else if (res.kind === 'invalid') {
+      checks.push({ level: 'warn', label: `Private ${label}`, detail: `${rel} is invalid JSON (${res.error}) — fix or remove` });
+    }
+  }
+  checks.push(
+    found.length
+      ? { level: 'ok', label: 'Private overlays (this project)', detail: found.join(', ') }
+      : { level: 'warn', label: 'Private overlays (this project)', detail: 'none yet — `starlog corpus add <pkg> --solves "…"` (discovery), `starlog facts add` (vetting)' },
+  );
+  return checks;
+}
+
 // ── Orchestrator ────────────────────────────────────────────────────────────
 
 export async function runDoctor(): Promise<number> {
@@ -276,6 +326,7 @@ export async function runDoctor(): Promise<number> {
   }
   checks.push(...(await checkMcp(settings)));
   checks.push(...(await checkHook(settings)));
+  checks.push(...(await checkPrivateOverlays(settings, projectDir)));
   checks.push(...(await checkProjectAgents(projectDir)));
   checks.push(await checkRanker());
 
