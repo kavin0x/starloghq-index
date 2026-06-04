@@ -1,0 +1,443 @@
+{
+  "xz-utils": {
+    "package": "xz-utils",
+    "ecosystem": "system",
+    "known_vulns": [
+      {
+        "id": "CVE-2024-3094",
+        "severity": "critical",
+        "affected": "5.6.0, 5.6.1",
+        "summary": "Malicious backdoor planted in upstream release tarballs by a maintainer; allows remote unauthenticated code execution via crafted SSH. CVSS 10.0."
+      }
+    ],
+    "license": "GPL-2.0-or-later",
+    "license_risk": "copyleft-strong",
+    "maintenance": "compromised",
+    "fetched_at": "2026-06-01"
+  },
+  "event-stream": {
+    "package": "event-stream",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "INCIDENT:event-stream-flatmap-2018",
+        "severity": "critical",
+        "affected": "3.3.6 (via flatmap-stream@0.1.1)",
+        "summary": "After a maintainer handoff, a malicious transitive dep (flatmap-stream) was added that targeted Copay bitcoin-wallet builds to exfiltrate credentials."
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "abandoned",
+    "fetched_at": "2026-06-01"
+  },
+  "ua-parser-js": {
+    "package": "ua-parser-js",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "INCIDENT:ua-parser-js-2021",
+        "severity": "critical",
+        "affected": "0.7.29, 0.8.0, 1.0.0",
+        "summary": "Maintainer account hijacked (Oct 2021); these versions shipped a password stealer and cryptominer. Treat installs as account-compromise."
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
+  },
+  "node-ipc": {
+    "package": "node-ipc",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "CVE-2022-23812",
+        "severity": "high",
+        "affected": "10.1.1, 10.1.2",
+        "summary": "Maintainer \"protestware\" (peacenotwar): overwrote/wiped files on hosts geolocated to Russia/Belarus. Intentional sabotage by the author."
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "compromised",
+    "fetched_at": "2026-06-01"
+  },
+  "colors": {
+    "package": "colors",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "INCIDENT:colors-faker-sabotage-2022",
+        "severity": "medium",
+        "affected": "1.4.44-liberty-2",
+        "summary": "Maintainer self-sabotage (Jan 2022): introduced an infinite loop printing garbage, breaking any app importing it (DoS)."
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "compromised",
+    "fetched_at": "2026-06-01"
+  },
+  "request": {
+    "package": "request",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "Apache-2.0",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-01"
+  },
+  "moment": {
+    "package": "moment",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-01"
+  },
+  "left-pad": {
+    "package": "left-pad",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "WTFPL",
+    "license_risk": "none",
+    "maintenance": "abandoned",
+    "fetched_at": "2026-06-01"
+  },
+  "grafana": {
+    "package": "grafana",
+    "ecosystem": "system",
+    "known_vulns": [],
+    "license": "AGPL-3.0-only",
+    "license_risk": "copyleft-strong",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
+  },
+  "chalk": {
+    "package": "chalk",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
+  },
+  "date-fns": {
+    "package": "date-fns",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
+  },
+  "lucia": {
+    "package": "lucia",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "passport-jwt": {
+    "package": "passport-jwt",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "csurf": {
+    "package": "csurf",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "launchdarkly-node-server-sdk": {
+    "package": "launchdarkly-node-server-sdk",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "Apache-2.0",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "posthog-node": {
+    "package": "posthog-node",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "MAL-2025-190925",
+        "severity": "medium",
+        "affected": "5.11.3, 5.13.3, 4.18.1",
+        "summary": "Historical supply-chain incident — pin away from the affected versions. Malicious code in posthog-node (npm)"
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "node-cache": {
+    "package": "node-cache",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "socket.io": {
+    "package": "socket.io",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "sockjs": {
+    "package": "sockjs",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "kue": {
+    "package": "kue",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "bottleneck": {
+    "package": "bottleneck",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "nodemailer": {
+    "package": "nodemailer",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT-0",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "prisma": {
+    "package": "prisma",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "Apache-2.0",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "request-promise": {
+    "package": "request-promise",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "ISC",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "node-sass": {
+    "package": "node-sass",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "faker": {
+    "package": "faker",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "GHSA-5w9c-rv96-fr7g",
+        "severity": "high",
+        "affected": "6.6.6",
+        "summary": "Removal of functional code in faker.js"
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "bower": {
+    "package": "bower",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "istanbul": {
+    "package": "istanbul",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "BSD-3-Clause",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "tslint": {
+    "package": "tslint",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "Apache-2.0",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "protractor": {
+    "package": "protractor",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "node-uuid": {
+    "package": "node-uuid",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "UNKNOWN",
+    "license_risk": "unknown",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "q": {
+    "package": "q",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "bluebird": {
+    "package": "bluebird",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "coffee-script": {
+    "package": "coffee-script",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "mkdirp": {
+    "package": "mkdirp",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "maintenance-only",
+    "fetched_at": "2026-06-04"
+  },
+  "babel-eslint": {
+    "package": "babel-eslint",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "har-validator": {
+    "package": "har-validator",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "deprecated",
+    "fetched_at": "2026-06-04"
+  },
+  "lodash": {
+    "package": "lodash",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "axios": {
+    "package": "axios",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "MAL-2026-2307",
+        "severity": "medium",
+        "affected": "0.30.4, 1.14.1",
+        "summary": "Historical supply-chain incident — pin away from the affected versions. Malicious code in axios (npm)"
+      }
+    ],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "express": {
+    "package": "express",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "zod": {
+    "package": "zod",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  },
+  "puppeteer": {
+    "package": "puppeteer",
+    "ecosystem": "npm",
+    "known_vulns": [
+      {
+        "id": "MAL-2026-5077",
+        "severity": "medium",
+        "affected": "25.0.1",
+        "summary": "Historical supply-chain incident — pin away from the affected versions. Malicious code in puppeteer (npm)"
+      }
+    ],
+    "license": "Apache-2.0",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-04"
+  }
+}
