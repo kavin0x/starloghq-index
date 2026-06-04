@@ -21,54 +21,24 @@ export interface ServiceDeps extends ComposeDeps {
 
 // ── Name resolution (the matcher) ────────────────────────────────────────────
 //
-// Two passes, exact-first. Character-substring matching is WRONG for a by-name
-// vetting lookup: it fabricates confident answers (e.g. "@starloghq/facts-schema"
-// → "q" because the scope "starloghq" *contains* the char "q"; "expres" → "express").
-// Worse, single-pass would let a loose match on an earlier public key shadow an
-// EXACT match on a later private key (e.g. public "auth" shadowing org "@acme/auth").
-//
-//   Pass 1 — normalized-exact across ALL keys. Exact always beats loose,
-//            independent of scan order. This is what protects org-private facts.
-//   Pass 2 — token-boundary loose, only if pass 1 found nothing. A package
-//            matches when its name tokens appear as a contiguous run inside the
-//            query's tokens (NL: "should I use moment for dates" → moment) or the
-//            query's tokens are a contiguous run inside the name's (abbrev:
-//            "xz" → "xz-utils"). Tokens split on name boundaries (/, @, -, ., _,
-//            whitespace), so a 1-char key like "q" only matches a standalone "q"
-//            token — never a substring of "starloghq".
-//
-// Known residual (out of scope here): a short common-English-word key ("is",
-// "ms", "q", "next") can still match a standalone same-spelled NL token. Rare
-// after tokenization; redesigning NL extraction is a separate change.
-
-/** Split a package name / query into lowercase tokens on name boundaries. */
-function tokenize(s: string): string[] {
-  return s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-}
-
-/** Does the token sequence `needle` appear as a contiguous run within `hay`? */
-function hasRun(hay: string[], needle: string[]): boolean {
-  if (needle.length === 0 || needle.length > hay.length) return false;
-  outer: for (let i = 0; i + needle.length <= hay.length; i++) {
-    for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer;
-    return true;
-  }
-  return false;
-}
-
+// EXACT-ONLY (normalized). Facts is a by-NAME vetting lookup: `starlog_facts`
+// takes `package` ("The package name to look up, e.g. ua-parser-js") and the CLI
+// takes a `<package>` argument. Free-text / capability discovery is a SEPARATE
+// path (`starlog_search`, which takes a NL `query`). So fuzzy matching has no
+// place here — any non-exact match fabricates an authoritative answer about a
+// DIFFERENT package. Two real failures from the prior fuzzy/token matcher, both
+// trust-breaking on the hero (org-private) path:
+//   • "@starloghq/facts-schema" → "q"        (scope "starloghq" contains char "q")
+//   • "express-rate-limit"      → "express"  ("express" is a leading name-token)
+// Normalization (lowercase + trim) is the only tolerance; everything else is a
+// miss → honest "no facts on file". This closes the whole fabrication class
+// (incl. "express rate limit", "lodash.merge", etc.) in one stroke. The NL
+// affordance lives in search, where it belongs.
 export function resolvePackage(query: string, keys: string[]): string | null {
   const q = query.toLowerCase().trim();
   if (!q) return null;
-  // Pass 1 — normalized-exact (order-independent; exact always wins).
   for (const key of keys) {
     if (key.toLowerCase().trim() === q) return key;
-  }
-  // Pass 2 — token-boundary loose, first-match-wins by key order.
-  const qt = tokenize(q);
-  for (const key of keys) {
-    const pt = tokenize(key);
-    if (pt.length === 0) continue; // an empty/symbol-only key matches nothing
-    if (hasRun(qt, pt) || hasRun(pt, qt)) return key;
   }
   return null;
 }
