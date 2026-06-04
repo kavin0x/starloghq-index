@@ -34,15 +34,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Build BEFORE tests: the facts CLI e2e tests spawn the built dist/cli.js.
+      # Running tests first made them fail with "Cannot find module dist/cli.js"
+      # (this blocked the v0.2.0 publish). Mirrors the ci.yml ordering.
+      - name: Build
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Test
         run: npm test
 
-      - name: Release gate — build, pack, smoke-test the tarball
+      - name: Release gate — pack + smoke-test the tarball
         run: |
-          npm run build
           echo "TARBALL=$(npm pack | tail -1)" >> "$GITHUB_ENV"
           echo "PKG_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
 
