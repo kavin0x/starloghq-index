@@ -724,6 +724,12 @@ function printPostInstallSummary(): void {
   console.log('\nYour agent will now vet packages with `starlog_facts` before adopting them.');
   console.log('Try it now:  starlog facts <a package you already use>');
   console.log('(e.g. `starlog facts axios`) — you get CVEs, license risk, and maintenance status.');
+
+  console.log('\nGot internal/private packages? Teach your agent about them (per-project, auto-read here):');
+  console.log('  starlog corpus add <pkg> --solves "<what it does>"   # so search surfaces it for a capability');
+  console.log('  starlog facts add  <pkg> --status active --license MIT   # so it vets clean');
+  console.log('This is the strongest case — the model can\'t know your private packages exist.');
+
   console.log('\nThe `starlog` CLI works in any terminal; Cursor, Copilot, and Codex get instruction files.');
 
   if (isEphemeralInstall()) {
