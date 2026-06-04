@@ -29,14 +29,15 @@ describe('L1 corpus (capability facts)', () => {
 });
 
 describe('L2 corpus (overlay)', () => {
-  it('has the 11 corpus packages, no duplicates', () => {
-    expect(new Set(L2_OVERLAYS_LIST.map((o) => o.package)).size).toBe(11);
-    expect(Object.keys(L2_BY_PACKAGE).sort()).toEqual([...CORPUS].sort());
+  it('is the curated overlay set, no duplicates, and covers every L1 corpus package', () => {
+    expect(new Set(L2_OVERLAYS_LIST.map((o) => o.package)).size).toBe(L2_OVERLAYS_LIST.length);
+    expect(L2_OVERLAYS_LIST.length).toBe(42); // 11 hand-authored + sourced (Phase 12 eval-driven curation)
+    for (const p of CORPUS) expect(L2_BY_PACKAGE[p]).toBeDefined(); // L2 is a superset of the L1 corpus
   });
 
-  it.each(L2_OVERLAYS_LIST)('$package: valid L2 schema, hand-attested, valid fetched_at date, NO effect_surface', (o) => {
+  it.each(L2_OVERLAYS_LIST)('$package: valid L2 schema, attested from a known source, valid fetched_at date, NO effect_surface', (o) => {
     expect(L2OverlaySchema.safeParse(o).success).toBe(true);
-    expect(o.attestation.source).toBe('hand');
+    expect(['hand', 'osv', 'deps.dev', 'scorecard']).toContain(o.attestation.source); // hand-authored or auto-sourced
     expect(o.attestation.refs.length).toBeGreaterThan(0);
     expect(isCalendarDate(o.attestation.fetched_at)).toBe(true);
     expect(o).not.toHaveProperty('effect_surface'); // L1 data must NOT leak into L2
@@ -60,7 +61,7 @@ describe('ground-truth invariants (cross-layer, by package)', () => {
     expect(L2_BY_PACKAGE['xz-utils'].known_vulns[0].id).toBe('CVE-2024-3094');
   });
 
-  it('every L2 package has a matching L1 capability fact (and vice versa) — layers cover the same corpus', () => {
-    expect(Object.keys(L2_BY_PACKAGE).sort()).toEqual(Object.keys(L1_BY_PACKAGE).sort());
+  it('every L1 capability fact has an L2 overlay (L2 is a superset — curated facts may be L2-only until the analyzer ships)', () => {
+    for (const p of Object.keys(L1_BY_PACKAGE)) expect(L2_BY_PACKAGE[p]).toBeDefined();
   });
 });
