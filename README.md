@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="demo/starlog-demo.gif" alt="Starlog vetting a package by name in the terminal, then wiring itself into Claude Code, Cursor, Copilot and Codex with one command" width="820">
+  <img src="demo/facts-demo.gif" alt="An AI coding agent vetting a package through the Starlog MCP server — pulling its known incidents, license, and maintenance before using it" width="820">
 </p>
 
 **Vet a package in one command — nothing to install, no API key, no account:**
@@ -115,9 +115,15 @@ starlog facts ua-parser-js
 
 ```
 ## ua-parser-js (npm)
-
-⚠ Known incident: INCIDENT:ua-parser-js-2021 — maintainer-account compromise (malicious versions published)
-Verified — as of 2026-06-01
+**Effect surface:** Parses User-Agent strings; pure data transformation, in-process.
+**Capabilities:** parsing
+**Maintenance:** active
+**License:** MIT (risk: none)
+**Known vulnerabilities / incidents:**
+  - INCIDENT:ua-parser-js-2021 [critical] affected: 0.7.29, 0.8.0, 1.0.0 — Maintainer account hijacked (Oct 2021); these versions shipped a password stealer and cryptominer. Treat installs as account-compromise.
+**Transitive risk:** Frequently a transitive dep — pin away from the three bad versions.
+**Source:** GitHub Security Advisory; CISA alert Oct 2021 (hand)
+**Verified:** as of 2026-06-01
 ```
 
 A package with no record returns an honest **"No facts on file"** — not a guess. Add `--format json` for machine-readable output with the independent `l1` / `l2` / `l3` layers.
