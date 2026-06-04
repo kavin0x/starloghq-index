@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { search } from './search.js';
+import { keywordSiftrank } from './siftrank.js';
+import { buildManifestFromInput } from './facts/authoring.js';
 import type { CapabilityManifest } from '../manifest/schema.js';
 import type { SiftrankFn, LlmFn } from './types.js';
 
@@ -107,5 +109,48 @@ describe('search() — private-first partition (FACTS-03)', () => {
     const ids = results.map((r) => r.manifest.id);
     expect(ids[0]).not.toBe('priv-off'); // not hijacking #1
     expect(ids).toEqual(['pub-a', 'pub-b', 'priv-off']); // plain score-desc
+  });
+});
+
+describe('corpus add → search: a minimal authored private entry is DISCOVERABLE (real keyword scorer)', () => {
+  // End-to-end of the discovery authoring path with the SHIPPED scorer (not mocked):
+  // a manifest built exactly as `corpus add` emits it (defaulted health/quality)
+  // must clear the relevance bar AND float private-first for a matching capability.
+  // This is the unit lock-in of the empirical "@acme/flags surfaced #1 at 76.86" result.
+  const authored = buildManifestFromInput({
+    package: '@acme/flags',
+    solves: 'Feature flags and remote configuration for Acme Node services — gradual rollout, kill switches, audit log.',
+    category: 'feature-flags',
+    stack: ['node'],
+    bestFor: ['feature flags', 'remote config', 'gradual rollout', 'kill switches'],
+  });
+  const publicFlagLib: CapabilityManifest = makeManifest({
+    id: 'some-public-flags',
+    name: 'Some Public Flags',
+    category: 'feature-flags',
+    solves: 'Feature flags and remote config for JavaScript apps.',
+    best_for: ['feature flags', 'remote config'],
+  });
+
+  it('surfaces the authored internal package and floats it ahead of the public option', async () => {
+    const results = await search(
+      'feature flags for a node app',
+      [publicFlagLib, authored],
+      { topK: 5, privateIds: new Set(['@acme/flags']), ...PURE },
+      { siftrank: keywordSiftrank, llm: noLlm },
+    );
+    const ids = results.map((r) => r.manifest.id);
+    expect(ids).toContain('@acme/flags'); // discoverable (cleared the relevance bar)
+    expect(ids[0]).toBe('@acme/flags'); // floated private-first over the public lib
+  });
+
+  it('an authored entry that is OFF-TOPIC for the query does not hijack #1 (relevance guard holds)', async () => {
+    const results = await search(
+      'image resizing library',
+      [publicFlagLib, authored],
+      { topK: 5, privateIds: new Set(['@acme/flags']), ...PURE },
+      { siftrank: keywordSiftrank, llm: noLlm },
+    );
+    expect(results[0]?.manifest.id).not.toBe('@acme/flags'); // below the 70 guard on an unrelated query
   });
 });

@@ -7,6 +7,7 @@ import {
   type Vuln,
 } from '@starloghq/facts-schema';
 import { parseOverlay } from './l2-source.js';
+import { CapabilityManifestSchema, type CapabilityManifest } from '../../manifest/schema.js';
 
 /**
  * PURE authoring layer — constructs schema-valid L2 overlays and L3 rules from
@@ -126,6 +127,101 @@ export function upsertL2Entry(
   const existing = (Array.isArray(file?.l2) ? file!.l2 : []) as L2Overlay[];
   const filtered = existing.filter((o) => o.package !== overlay.package);
   return { l1, l2: [...filtered, overlay] };
+}
+
+// ── DISCOVERY authoring (private corpus) ──────────────────────────────────────
+//
+// `facts add` makes an internal package VETTABLE (STARLOG_PRIVATE_FACTS). This
+// mirror makes it DISCOVERABLE (STARLOG_PRIVATE_CORPUS) — so `search` surfaces the
+// org's sanctioned package private-first for a capability query. The
+// CapabilityManifest schema requires public-signal fields (health/quality) that
+// are meaningless for an internal package; we fill honest zero/neutral defaults.
+// They are NOT scorer inputs (keyword ranking keys on name/category/solves/
+// best_for/stack), so defaulting them does not affect discoverability.
+
+const INTEGRATION_EFFORT = ['drop-in', 'easy', 'moderate', 'significant', 'major'] as const;
+const MANIFEST_ECOSYSTEMS = ['npm', 'pypi', 'both'] as const;
+
+export interface AddManifestInput {
+  package: string; // becomes id + default name
+  solves?: string; // REQUIRED — the one line search matches a capability against
+  name?: string;
+  category?: string; // free-form; default 'other'
+  ecosystem?: string; // npm | pypi | both; default npm
+  stack?: string[]; // stack_affinity
+  bestFor?: string[];
+  skipWhen?: string[];
+  effort?: string; // integration_effort; default 'moderate'
+  repo?: string; // default null
+  license?: string; // for the discovery card's health.license; default 'UNLICENSED'
+}
+
+/**
+ * Build a schema-valid CapabilityManifest from minimal input, filling required
+ * signal fields with honest defaults. Throws a clear, actionable Error on
+ * missing/invalid input (mirrors buildL2FromInput's AUTH-04 contract).
+ */
+export function buildManifestFromInput(input: AddManifestInput): CapabilityManifest {
+  const solves = input.solves?.trim();
+  if (!solves) {
+    throw new Error(
+      'Missing --solves "<what it does>" — the one line agents match a capability query against. Without it the package is not discoverable.',
+    );
+  }
+  const ecosystem = input.ecosystem ?? 'npm';
+  if (!(MANIFEST_ECOSYSTEMS as readonly string[]).includes(ecosystem)) {
+    throw new Error('Invalid --ecosystem "' + ecosystem + '" — use one of: ' + MANIFEST_ECOSYSTEMS.join(', '));
+  }
+  const effort = input.effort ?? 'moderate';
+  if (!(INTEGRATION_EFFORT as readonly string[]).includes(effort)) {
+    throw new Error('Invalid --effort "' + effort + '" — use one of: ' + INTEGRATION_EFFORT.join(', '));
+  }
+
+  const candidate = {
+    id: input.package,
+    name: input.name?.trim() || input.package,
+    repo: input.repo ?? null,
+    ecosystem,
+    category: input.category?.trim() || 'other',
+    solves,
+    stack_affinity: input.stack ?? [],
+    integration_effort: effort,
+    best_for: input.bestFor ?? [],
+    skip_when: input.skipWhen ?? [],
+    hosted_alternative: null,
+    alternative_ids: [],
+    health: {
+      stars: 0,
+      weekly_downloads: 0,
+      last_commit: today(),
+      contributors: 0,
+      license: input.license ?? 'UNLICENSED',
+      open_issues: 0,
+    },
+    quality: { has_tests: false, has_docs: false, has_types: false, maintenance_status: 'active' as const },
+    auto_generated: false,
+  };
+
+  const r = CapabilityManifestSchema.safeParse(candidate);
+  if (!r.success) {
+    const why = r.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+    throw new Error('Internal: constructed manifest failed schema validation: ' + why);
+  }
+  return r.data;
+}
+
+/**
+ * Upsert a manifest into the `{ manifests }` private-corpus file shape. Unrelated
+ * entries are preserved; the same-id entry is replaced. An absent/empty/malformed
+ * file object yields `{ manifests: [manifest] }`.
+ */
+export function upsertManifestEntry(
+  file: { manifests?: unknown[] } | null | undefined,
+  manifest: CapabilityManifest,
+): { manifests: CapabilityManifest[] } {
+  const existing = (Array.isArray(file?.manifests) ? file!.manifests : []) as CapabilityManifest[];
+  const filtered = existing.filter((m) => m.id !== manifest.id);
+  return { manifests: [...filtered, manifest] };
 }
 
 /** Stable rule id for a package — re-running policy UPSERTS, never duplicates. */
