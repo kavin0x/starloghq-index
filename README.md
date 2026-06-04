@@ -61,7 +61,7 @@ npx starloghq init
 
 This wires Starlog into Claude Code (and drops instruction files for Cursor, Copilot, Codex):
 
-- **MCP server** added to `~/.claude/settings.json` — exposes `starlog_facts` (vet a package by name) and `starlog_search` (discover candidates)
+- **MCP server** added to `~/.claude/settings.json` — exposes `starlog_facts` (vet a package by name) and `starlog_search` (discover candidates), and wires your **per-project private overlays** (`${CLAUDE_PROJECT_DIR}/.starlog/*`) into the agent so internal-package facts + discovery work automatically in each project
 - **PostToolUse hook** installed — surfaces a package's facts on install
 - Previews every change and asks before writing; **idempotent** and safe to re-run
 
@@ -150,6 +150,21 @@ Search uses the **local keyword ranker** — no API key, no network. Scores are 
 --format <type>     Output format: table or json
 --context <desc>    Project context to tailor the "vs custom" rationale
 ```
+
+### Your internal packages — the hero case, in two commands
+
+The model structurally **can't** know your private `@acme/*` packages exist — so this is where facts change the most decisions (DIY → the org's sanctioned library). You don't hand-write JSON; two commands author the overlays, and `starlog init` already wired the agent to read them **per-project**:
+
+```bash
+# Make it discoverable — search will surface it (private-first) for a capability:
+starlog corpus add @acme/flags --solves "Feature flags + remote config for Acme Node services" \
+    --category feature-flags --stack node --best-for "gradual rollout,kill switches"
+
+# Make it vet clean — facts confirms it's active/maintained:
+starlog facts add @acme/flags --status active --license MIT
+```
+
+These write `.starlog/private-corpus.json` (discovery) and `.starlog/private-facts.json` (vetting) in your project. Because `starlog init` bakes `${CLAUDE_PROJECT_DIR}/.starlog/*` into the MCP server's env, your coding agent picks them up **automatically in that project** — no shell `export`, nothing to re-run. Confirm with `starlog doctor` (it reports the wiring and what each project has authored). For richer overlays — full `l1`/`l2` arrays, org `STARLOG_POLICY` allow/deny verdicts, or pushing to the hosted API with `starlog facts push` — see [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
 
 ## How it works
 
