@@ -35,27 +35,23 @@ npx starloghq init
 
 ## Why
 
-AI coding agents (Claude Code, Cursor, Copilot) pick libraries from their training data — which ranks options by how often they appeared in scraped code, not by what actually fits your task. Popularity, not merit. The results are weak: research finds agents draw from only 32–39 unique libraries across projects and are highly inconsistent (83%) in what they recommend, and they default to hand-rolling custom code instead of reaching for a battle-tested library across most capability categories.
+AI coding agents (Claude Code, Cursor, Copilot) pick libraries from **training recall** — a snapshot of scraped code, frozen at a cutoff date and ranked by how often an option appeared, not by what fits your task or what's safe *now*. That recall can't know about a CVE disclosed last week, and it has never seen your company's internal libraries. The agent recommends anyway, with the same confidence either way.
 
-AI-suggested dependencies are also often unsafe: research finds ~49% carry known vulnerabilities and ~34% are hallucinated outright — the package simply doesn't exist. Picking a real, well-maintained library, and knowing when to skip one, is most of the battle.
+The failure modes are measurable: research finds ~49% of AI-suggested dependencies carry known vulnerabilities and ~34% are hallucinated outright — the package doesn't exist. And for whole categories — most dangerously auth — agents default to hand-rolling custom code instead of reaching for a vetted library.
 
-Starlog is a local **capability index** for AI coding agents: a structured, queryable description of what libraries actually do — what each solves, which stacks it fits, and when to skip one — put in front of your agent at decision time instead of training-data recall. Its hero surface is **vetting by name**: `starlog facts <package>` returns authoritative, dated facts (known CVEs/incidents, SPDX license + risk, maintenance status, capability) — or an honest "no facts on file" — so your agent makes the install/avoid/pick call on facts, not training-data recall. It runs entirely on your machine as an MCP server and a package-install hook — no API key, no sign-up. This repo ships the engine plus a corpus of 25 manifests across 7 categories.
+You can't fix recall by prompting harder. **Starlog puts authoritative, dated facts in front of your agent at decision time.** Its hero surface is **vetting by name** — `starlog facts <package>` returns known CVEs/incidents, SPDX license + risk, and maintenance status (or an honest *"no facts on file"*) — so the install/avoid/pick call rides on facts, not recall. It runs entirely on your machine as an MCP server and a package-install hook, no API key, no sign-up. A companion `starlog_search` finds candidate packages for a capability; facts vet the pick.
 
-**Benchmarked across 1,008 runs on 3 Claude models:**
-
-- **11.3pp fewer hand-rolled implementations** (17% → 5.7%)
-- **Authentication**: 39.6% → 20.8% custom code
-- **Feature flags**: 37.5% → 4.2% custom code
-- **100% tool adoption** — agents use it every time it's available
-- **Consistent across models** (Sonnet 4.5, Opus 4.5, Opus 4.6)
+**Does it actually change what the agent decides?** Yes — measured before/after, on the venue that matters (private libraries and post-cutoff advisories). → [the validated result](#does-it-change-the-agents-decision).
 
 ## What you get
 
-- **`starlog_facts` MCP tool** — your agent looks up **authoritative facts about a specific package** before recommending it: known CVEs/supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and effect surface. In a 4-model benchmark, agents called this tool unprompted on package decisions (100% recall, 98% specificity) and it moved them toward the correct install/avoid/pick call. Every record is sourced, verified, and **dated** — each result shows an "as of `<date>`" line so a stale "no known vulns" is never mistaken for a fresh one (the corpus is refreshed and re-verified on an ongoing basis). A package with no record returns an honest "no facts on file." Facts are organized in three independent layers, composed at query time: **L1** capability/effect-surface (immutable), **L2** reputation/vuln/license/maintenance (mutable — carries the `as of` recency), and **L3** org policy (your suitability verdict). Override or extend any of them locally: point `STARLOG_PRIVATE_FACTS` at a JSON file with independent `l1`/`l2` arrays (internal packages, license rulings), and `STARLOG_POLICY` at an org policy (`{ org, rules }`) to get allow/deny/flag verdicts at decision time. With a `STARLOG_API_KEY` set, org-private overlays and policy are served from the hosted facts API (authoritative, with the local corpus as the offline fallback); `starlog facts push` uploads your org's overlays + policy. See [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
-- **`starlog_search` MCP tool** — your agent discovers candidate packages for a capability (org-sanctioned options first), then vets the named pick with `starlog_facts`. Discovery surfaces what exists; facts vet it.
-- **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and surfaces that library's `skip_when` conditions and alternatives as context, so the agent can reconsider or swap before building on it. It's advisory — it informs the agent's next move, it doesn't block the install.
-- **`starlog search` / `starlog facts` CLI** — query the same index and facts corpus directly from your terminal.
-- **Runs on your machine** — the engine and corpus are local; searches need no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)
+- **`starlog_facts` MCP tool** — your agent looks up **authoritative facts about a specific package** before recommending it: known CVEs/supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and effect surface. In a 4-model benchmark, agents called this tool unprompted on package decisions (100% recall, 98% specificity) and it moved them toward the correct install/avoid/pick call. Every record is sourced, verified, and **dated** — each result shows an "as of `<date>`" line so a stale "no known vulns" is never mistaken for a fresh one. A package with no record returns an honest "no facts on file." Facts are three independent layers, composed at query time: **L1** capability/effect-surface (immutable), **L2** reputation/vuln/license/maintenance (mutable — carries the `as of` recency), **L3** org policy (your suitability verdict). Override or extend any layer locally: point `STARLOG_PRIVATE_FACTS` at a JSON file with independent `l1`/`l2` arrays (internal packages, license rulings) and `STARLOG_POLICY` at an org policy (`{ org, rules }`) for allow/deny/flag verdicts. With `STARLOG_API_KEY` set, org-private overlays and policy come from the hosted facts API (local corpus is the offline fallback); `starlog facts push` uploads your org's overlays + policy. See [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
+- **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and **surfaces that package's facts** (known incidents, license, maintenance) *before* the agent builds on it. Advisory — it informs the next move, it doesn't block the install. Packages with no record are queued for coverage.
+- **`starlog_search` MCP tool** — discovery: find candidate packages for a capability (org-sanctioned options first), then vet the named pick with `starlog_facts`. Discovery surfaces what exists; facts vet it.
+- **`starlog facts` / `starlog search` CLI** — the same facts and discovery from your terminal.
+- **Runs on your machine** — the engine and corpus are local; vetting needs no account, no API key, and no network. (The one exception is anonymous, opt-out usage telemetry — see [Telemetry](#telemetry).)
+
+This repo ships the engine plus a curated **facts corpus of 42 packages** and a discovery corpus of **25 capability manifests across 7 categories**.
 
 ## Quick start
 
@@ -63,10 +59,10 @@ Starlog is a local **capability index** for AI coding agents: a structured, quer
 npx starloghq init
 ```
 
-This wires Starlog into Claude Code:
+This wires Starlog into Claude Code (and drops instruction files for Cursor, Copilot, Codex):
 
-- **MCP server** added to `~/.claude/settings.json` — exposes the `starlog_search` tool
-- **PostToolUse hook** installed — surfaces `skip_when` conditions and alternatives on package installs
+- **MCP server** added to `~/.claude/settings.json` — exposes `starlog_facts` (vet a package by name) and `starlog_search` (discover candidates)
+- **PostToolUse hook** installed — surfaces a package's facts on install
 - Previews every change and asks before writing; **idempotent** and safe to re-run
 
 Install globally so the `starlog` command is always on your PATH:
@@ -76,15 +72,10 @@ npm install -g starloghq
 starlog init
 ```
 
-Add `--project` to also drop Starlog guidance into your project's `CLAUDE.md`:
+Add `--project` to also drop Starlog guidance into your project's `CLAUDE.md`; preview without writing, or remove cleanly:
 
 ```bash
 starlog init --project
-```
-
-Preview without writing, or remove cleanly:
-
-```bash
 starlog init --dry-run
 starlog init --uninstall
 ```
@@ -94,7 +85,7 @@ starlog init --uninstall
 ```bash
 git clone https://github.com/starloghq/index.git starlog-index
 cd starlog-index && npm install
-npx tsx src/cli.ts init
+npx tsx src/cli.ts facts ua-parser-js
 ```
 
 ### Manual MCP setup
@@ -112,9 +103,26 @@ npx tsx src/cli.ts init
 }
 ```
 
-This is the same launch command MCP registries use. (From a local source clone instead, point `node` at `dist/mcp.js` — `$(npm root -g)/starloghq/dist/mcp.js` for a global install, or your clone's path.) The server exposes two tools: `starlog_search` (a natural-language capability query with optional `category`, `stack`, and `top_k` filters) and `starlog_facts` (an authoritative per-package fact lookup — CVEs, license, maintenance).
+This is the same launch command MCP registries use. (From a local source clone instead, point `node` at `dist/mcp.js` — `$(npm root -g)/starloghq/dist/mcp.js` for a global install, or your clone's path.) The server exposes two tools: `starlog_facts` (an authoritative per-package fact lookup — CVEs, license, maintenance) and `starlog_search` (a natural-language capability query with optional `category`, `stack`, and `top_k` filters).
 
 ## CLI usage
+
+**Vet a package by name** — the hero. Local, no key, no network:
+
+```bash
+starlog facts ua-parser-js
+```
+
+```
+## ua-parser-js (npm)
+
+⚠ Known incident: INCIDENT:ua-parser-js-2021 — maintainer-account compromise (malicious versions published)
+Verified — as of 2026-06-01
+```
+
+A package with no record returns an honest **"No facts on file"** — not a guess. Add `--format json` for machine-readable output with the independent `l1` / `l2` / `l3` layers.
+
+**Discover candidates** for a capability, then vet the named pick with `facts`:
 
 ```bash
 starlog search "auth for a Next.js app"
@@ -127,9 +135,7 @@ starlog search "auth for a Next.js app"
 2   Clerk               authentication    60.64   Provides a fully managed authentication and user management platfor...
 ```
 
-Out of the box this uses the **local keyword ranker** — no API key, no network. Scores are absolute (a strong match lands in the 70s–80s; weak matches stay low), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer. See `--context` below for `vs custom` analysis.
-
-Options:
+Search uses the **local keyword ranker** — no API key, no network. Scores are absolute (a strong match lands in the 70s–80s), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer.
 
 ```
 --category <cat>    Filter by category (authentication, feature-flags, etc.)
@@ -139,39 +145,19 @@ Options:
 --context <desc>    Project context to tailor the "vs custom" rationale
 ```
 
-## Ranking
-
-Starlog ranks results with its **keyword ranker** — the default and only mode. It matches your query against each library's capability data and reports an *absolute* score, so an off-topic or out-of-corpus query returns "no strong match" instead of a forced result. It runs offline: no key, no network, no setup. Add `--context "<your project>"` for a per-library **`vs custom`** rationale.
-
-## Auto-registry hook
-
-The corpus grows from what you actually install. When your agent installs a package that has no manifest yet, the hook records it:
-
-```
-[Starlog] Queued "drizzle-orm" for manifest generation (no existing manifest found).
-```
-
-Queued packages are written to a project-local log (`.starlog/pending.json`) and a global queue (`~/.starlog/pending.json`).
-
 ## How it works
 
-```
-Corpus (local capability manifests)
-    |
-    v
-Query Engine (keyword matching + relevance scoring)
-    |
-    v
-Transport (MCP server or CLI)
-```
+Starlog vets a package as **three independent layers, composed at query time** — never collapsed into one blurry "score":
 
-Each manifest is a structured description of a library — not documentation, but **capability data**: what it solves, which stacks it fits, integration effort, and when to skip it. Tools like Context7 index *documentation* (how an API works); Starlog indexes *capability* (what a library is for, and when not to use it).
+| Layer | Answers | Mutability |
+|---|---|---|
+| **L1** capability / effect-surface | what does the code *do*? | immutable |
+| **L2** reputation overlay | what's *known*? — CVEs, license, maintenance | mutable; carries the dated `as of` recency |
+| **L3** org policy | is it *allowed here*? | your rules → allow / deny / flag |
 
-**Stored fields:** `id`, `name`, `category`, `solves`, `stack_affinity`, `integration_effort`, `best_for`, `skip_when`, `health`, `quality`
+`starlog facts <pkg>` composes the three for the caller and returns them — or an honest miss — over the **MCP server**, the **CLI**, or the **install hook**. The corpus is local and cacheable; override or extend any layer with `STARLOG_PRIVATE_FACTS` (internal packages, license rulings) and `STARLOG_POLICY`. The full contract: [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
 
-**Computed at query time:** `relevance_score`, `context_fit`, `vs_custom`, `tradeoffs`
-
-The corpus is static and cacheable; the analysis adapts to each query's context.
+Discovery (`starlog_search`) is a separate surface: it ranks capability manifests with an offline keyword ranker against each library's `solves` / `best_for` / `stack_affinity`, reporting an *absolute* score so an out-of-corpus query returns "no strong match" instead of a forced result. When your agent installs a package with no manifest yet, the hook queues it (`.starlog/pending.json`) for coverage.
 
 ## Does it change the agent's decision?
 
@@ -185,39 +171,11 @@ Backed by a powered benchmark across **four model vendors**: correct adopt/avoid
 
 **Full before/after, the honest scope, and the experiment we threw out → [docs/VALIDATION.md](docs/VALIDATION.md).**
 
-## Benchmark results
+## Coverage
 
-> The numbers below are from the earlier **search** thesis (capability ranking), a separate experiment from the facts validation above.
+**Facts corpus — 42 packages.** Curated and dated: known supply-chain incidents (xz, event-stream, ua-parser-js, node-ipc, …), notable deprecations, and clean baselines — each with SPDX license + risk, maintenance status, and an `as of` date. Extend it for your org via `STARLOG_PRIVATE_FACTS` (internal packages) without touching the public set.
 
-Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-spa, node-cli), 7 categories, 3 repetitions per configuration.
-
-### Custom-code rate reduction by category
-
-| Category | Baseline | With Starlog | Reduction |
-|---|---|---|---|
-| Authentication | 39.6% | 20.8% | **-18.8pp** |
-| Feature Flags | 37.5% | 4.2% | **-33.3pp** |
-| Caching | 14.6% | 0% | **-14.6pp** |
-| Background Jobs | 12.5% | 0% | **-12.5pp** |
-| Real-time | 12.5% | 8.3% | -4.2pp |
-| Email | 2.1% | 6.3% | +4.2pp |
-| ORM/Database | 0% | 0% | 0pp |
-
-### Custom-code rate reduction by model
-
-| Model | Baseline | With Starlog | Reduction |
-|---|---|---|---|
-| Claude Sonnet 4.5 | 14.3% | 6.3% | **-8.0pp** |
-| Claude Opus 4.5 | 17.0% | 4.5% | **-12.5pp** |
-| Claude Opus 4.6 | 19.6% | 6.3% | **-13.4pp** |
-
-### Known limitation: diversity trade-off
-
-Starlog narrows the option space — by steering toward vetted libraries, agents converge on fewer of them (a measured ~30% diversity reduction). That's an inherent trade-off of recommending proven options over maximal variety. The reduction in hand-rolled code holds across both context-injection and tool-use delivery, indicating it's a property of the capability data, not the delivery method.
-
-## Categories
-
-The bundled corpus covers 7 categories:
+**Discovery corpus — 25 capability manifests across 7 categories:**
 
 | Category | Examples |
 |---|---|
@@ -229,9 +187,7 @@ The bundled corpus covers 7 categories:
 | Feature Flags | LaunchDarkly, PostHog, Flagsmith, ConfigCat, DevCycle |
 | Caching | ioredis, Upstash Redis, Keyv, Cacheable |
 
-Each manifest carries health signals (stars, downloads, last commit, contributors) and quality indicators (tests, docs, types, maintenance status).
-
-> **Note:** Manifest data (pricing, health stats, `skip_when`, alternatives) is **point-in-time and may be out of date or imperfect**. It's a decision aid, not ground truth — verify anything load-bearing, and corrections via PR are welcome.
+> **Note:** facts and manifest data are **point-in-time** — sourced and dated, but a decision aid, not ground truth. Verify anything load-bearing; corrections via PR are welcome.
 
 ## Testing
 
@@ -239,16 +195,16 @@ Each manifest carries health signals (stars, downloads, last commit, contributor
 npx vitest run
 ```
 
-Unit tests cover schema validation, corpus loading, format output, and relevance ranking. All tests run without API keys or external binaries.
+Unit and e2e tests cover schema validation, corpus loading + integrity, facts/format output, the spawned-CLI round-trip, and search ranking. All run without API keys or external binaries.
 
 ## Telemetry
 
 Starlog collects **anonymous, opt-out** usage telemetry to understand which
 commands and capabilities are used. It sends: the command run
-(`init`/`search`/`doctor`), the CLI/Node/OS version, which agents were detected,
-and coarse result counts. It **never** sends your search queries, file paths,
-usernames, hostnames, or any file contents. It's also disabled automatically in
-CI and test runs.
+(`init`/`facts`/`search`/`doctor`), the CLI/Node/OS version, which agents were
+detected, and coarse result counts. It **never** sends your queries, package
+names, file paths, usernames, hostnames, or any file contents. It's also disabled
+automatically in CI and test runs.
 
 A one-line notice is printed on first run. Opt out at any time:
 
