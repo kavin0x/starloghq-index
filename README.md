@@ -173,7 +173,21 @@ Each manifest is a structured description of a library — not documentation, bu
 
 The corpus is static and cacheable; the analysis adapts to each query's context.
 
+## Does it change the agent's decision?
+
+The real test of a facts tool isn't "does it return data" — it's "does the agent decide differently." Measured before/after (control = recall only; treatment = same prompt + Starlog facts):
+
+- **Private packages (the hero case):** given an *informational-only* fact that an active internal library exists — no "you must use it" — the agent stops hand-rolling and picks the internal library. **2/2, DIY → internal, on information alone.** The model structurally can't recall your private `@acme/*` packages; facts are how it learns they exist.
+- **Post-cutoff supply chain:** for `posthog-node`, facts add *"pin away from the malicious 4.18.1 / 5.11.3 / 5.13.3"* — advisory `MAL-2025-190925`, published after the model's training cutoff. It can't know this; the facts can.
+- **No spurious flips:** healthy decoys (`zod`, `fastify`) don't change, and `node-cache` (ambiguous, no ground truth) is deliberately **not** counted as a win — a tool that books every change as a victory is lying to you.
+
+Backed by a powered benchmark across **four model vendors**: correct adopt/avoid decisions moved **~20% → ~78%**, with **100% unprompted adoption**.
+
+**Full before/after, the honest scope, and the experiment we threw out → [docs/VALIDATION.md](docs/VALIDATION.md).**
+
 ## Benchmark results
+
+> The numbers below are from the earlier **search** thesis (capability ranking), a separate experiment from the facts validation above.
 
 Tested across 3 Claude models, 4 project types (nextjs-saas, python-api, react-spa, node-cli), 7 categories, 3 repetitions per configuration.
 
