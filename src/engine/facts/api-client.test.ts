@@ -90,4 +90,24 @@ describe('createFactsApiClient', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toContain('401');
   });
+
+  it('relays X-Starlog-Anon-Id when an anon id is present (the CLI->person stitch)', async () => {
+    const fetchMock = vi.fn(async () => fakeRes(true, { found: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createFactsApiClient({ apiKey: 'k', baseUrl: 'http://t', anonId: 'anon-123' })!;
+    await client.getFacts('p');
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['X-Starlog-Anon-Id']).toBe('anon-123');
+    // still carries auth
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer k');
+  });
+
+  it('omits X-Starlog-Anon-Id entirely when telemetry is opted out (anonId null)', async () => {
+    const fetchMock = vi.fn(async () => fakeRes(true, { found: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createFactsApiClient({ apiKey: 'k', baseUrl: 'http://t', anonId: null })!;
+    await client.getFacts('p');
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['X-Starlog-Anon-Id']).toBeUndefined();
+  });
 });
