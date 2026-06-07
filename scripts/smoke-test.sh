@@ -138,7 +138,7 @@ INIT_REQ='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersi
 check "MCP server starts through a symlinked path (run-if-main guard)" $?
 
 # Uninstall must remove the MCP server entry.
-starlog init --uninstall -y >/dev/null 2>&1
+( cd "$PROJECT" && starlog init --uninstall -y >/dev/null 2>&1 )
 check "uninstall runs cleanly" $?
 { [ -f "$HOME/.claude/settings.json" ] && ! grep -q '"starlog"' "$HOME/.claude/settings.json"; }
 check "uninstall removes the starlog MCP server" $?
