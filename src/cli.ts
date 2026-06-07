@@ -26,8 +26,33 @@ import { atomicWrite } from './fsutil.js';
 import { getPackageVersion } from './paths.js';
 import { detectAgents } from './install/detect.js';
 import { track, telemetryStatus, setTelemetryEnabled } from './telemetry.js';
+import { starlogMcpWiring } from './mcp-config.js';
 
 const VALID_CATEGORIES = KnownCategorySchema.options;
+
+/**
+ * Self-heal nudge for the install-≠-wired gap. When an agent (or a person) drives
+ * the CLI via Bash but never ran `starlog init`, the MCP tools were never
+ * registered — so the agent shells out instead of calling starlog_search/_facts
+ * automatically. One stderr line points them at the fix.
+ *
+ * Fires only when settings.json EXISTS but lacks starlog ('unwired') — i.e. a
+ * confirmed Claude Code user who skipped init. Stays silent on 'unknown'
+ * (no/invalid settings.json) and is suppressed by STARLOG_NO_NUDGE (used by the
+ * e2e harness to keep spawned-binary stdout/stderr assertions hermetic).
+ *
+ * stderr, never stdout: keeps piped/JSON output clean. JSON callers are skipped
+ * entirely.
+ */
+async function nudgeInitIfUnwired(format: string): Promise<void> {
+  if (format === 'json') return;
+  if (process.env.STARLOG_NO_NUDGE) return;
+  if ((await starlogMcpWiring()) !== 'unwired') return;
+  console.error(
+    '\nTip: your AI agent is not wired to call Starlog automatically — run `starlog init` ' +
+    '(then restart your agent) so it discovers and vets packages without being asked.',
+  );
+}
 
 /** Turn a thrown error into a concise, actionable message + non-zero exit,
  *  instead of an UnhandledPromiseRejection stack trace. */
@@ -117,9 +142,10 @@ program
 
     if (results.length === 0) {
       console.error(
-        `No strong match in the local index. It covers: ${VALID_CATEGORIES.join(', ')}.\n` +
-        `Try rephrasing toward one of those capabilities.`,
+        `No strong match in the local index. Discovery covers these JS/TS capabilities: ${VALID_CATEGORIES.join(', ')}.\n` +
+        `If your stack is non-JS/TS, search has no candidates to surface — but \`starlog facts <package>\` still vets any package by name, and \`starlog corpus add <pkg> --solves "…"\` makes your internal packages discoverable here.`,
       );
+      await nudgeInitIfUnwired(opts.format);
       process.exit(0);
     }
 
@@ -139,6 +165,7 @@ program
       : formatTable(results);
 
     console.log(output);
+    await nudgeInitIfUnwired(opts.format);
   }));
 
 program
@@ -228,6 +255,7 @@ facts
     } else {
       console.log(formatFactView(pkg, view));
     }
+    await nudgeInitIfUnwired(opts.format);
     // A miss is an honest answer, not an error — exit 0 either way.
   }));
 

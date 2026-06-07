@@ -30,6 +30,7 @@
   "files": [
     "dist/",
     "corpus-free/",
+    "postinstall.mjs",
     "CHANGELOG.md"
   ],
   "workspaces": [
@@ -38,6 +39,7 @@
   "scripts": {
     "gen:facts": "tsx scripts/gen-l2-facts.ts",
     "build": "npm run gen:facts && node build.mjs",
+    "postinstall": "node postinstall.mjs",
     "prepublishOnly": "npm run build",
     "search": "tsx src/cli.ts search",
     "bench:facts": "tsx scripts/bench-facts.ts",

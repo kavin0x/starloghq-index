@@ -23,6 +23,20 @@ describe('formatFactView', () => {
     expect(out).toContain('No facts on file for "no-such"');
   });
 
+  it('miss → converts the dead-end: explains the mainstream-public expectation + gates internal authoring behind a condition', () => {
+    const out = formatFactView('no-such', null);
+    // Reframe (regression guard on the designed wording, not just the prefix):
+    // a blank on a mainstream public package is expected, with the right next step.
+    expect(out).toMatch(/mainstream public package/i);
+    expect(out).toMatch(/npm audit|OSV/);
+    // The `facts add` hint MUST stay conditional on "internal" so an over-eager
+    // agent doesn't author private facts for a public lib like lodash.
+    expect(out).toMatch(/[Oo]nly if .* internal/);
+    expect(out).toContain('starlog facts add <package>');
+    // It must NOT pre-fill a runnable add command for the looked-up name.
+    expect(out).not.toContain('starlog facts add no-such ');
+  });
+
   it('full view: heading, L1 effect surface + capabilities, L2 fields, recency from L2.fetched_at', () => {
     const out = formatFactView('p', view({
       l1: L1({ effect_surface: 'runs in-process', capabilities: ['network', 'fs'] }),

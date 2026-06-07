@@ -7,6 +7,7 @@ import {
   type L2Overlay,
   type L3Policy,
 } from '@starloghq/facts-schema';
+import { telemetryAnonId } from '../../telemetry.js';
 
 /**
  * Client for the hosted facts API (the starlog-api worker). Matches the
@@ -65,7 +66,12 @@ export function parseFactsApiResponse(json: unknown): FactsApiResponse {
 }
 
 class FactsApiClientImpl implements FactsApiClient {
-  constructor(private readonly apiKey: string, private readonly baseUrl: string, private readonly timeoutMs: number) {}
+  constructor(
+    private readonly apiKey: string,
+    private readonly baseUrl: string,
+    private readonly timeoutMs: number,
+    private readonly anonId: string | null,
+  ) {}
 
   private async req(path: string, init?: RequestInit): Promise<Response | null> {
     const controller = new AbortController();
@@ -73,7 +79,15 @@ class FactsApiClientImpl implements FactsApiClient {
     try {
       return await fetch(`${this.baseUrl}${path}`, {
         ...init,
-        headers: { Authorization: `Bearer ${this.apiKey}`, ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          // Relay the anonymous CLI id so the server can alias this install to
+          // the GitHub person at key issuance. Omitted entirely when telemetry
+          // is opted out (anonId === null).
+          ...(this.anonId ? { 'X-Starlog-Anon-Id': this.anonId } : {}),
+          ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+          ...init?.headers,
+        },
         signal: controller.signal,
       });
     } catch (err) {
@@ -122,9 +136,13 @@ class FactsApiClientImpl implements FactsApiClient {
  * Build a facts API client, or null when no key is configured (callers treat
  * null as "local only"). baseUrl defaults to STARLOG_API_URL or api.starlog.dev.
  */
-export function createFactsApiClient(opts: { apiKey?: string; baseUrl?: string; timeoutMs?: number } = {}): FactsApiClient | null {
+export function createFactsApiClient(
+  opts: { apiKey?: string; baseUrl?: string; timeoutMs?: number; anonId?: string | null } = {},
+): FactsApiClient | null {
   const apiKey = opts.apiKey ?? process.env.STARLOG_API_KEY;
   if (!apiKey) return null;
   const baseUrl = opts.baseUrl ?? process.env.STARLOG_API_URL ?? DEFAULT_BASE_URL;
-  return new FactsApiClientImpl(apiKey, baseUrl, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  // Default the relay id from telemetry (null when opted out); tests inject it.
+  const anonId = opts.anonId !== undefined ? opts.anonId : telemetryAnonId();
+  return new FactsApiClientImpl(apiKey, baseUrl, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, anonId);
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -51,6 +51,10 @@ function runFacts(args: string[], env?: Record<string, string>): RunResult {
   // Explicit per-test overrides below still win.
   delete childEnv.STARLOG_API_KEY;
   delete childEnv.STARLOG_POLICY;
+  // Suppress the self-heal init nudge by default — it reads the ambient
+  // ~/.claude/settings.json, so leaving it on would make stderr non-deterministic
+  // across machines/CI and break the "a miss leaks nothing to stderr" assertion.
+  childEnv.STARLOG_NO_NUDGE = '1';
   Object.assign(childEnv, env ?? {});
   try {
     const stdout = execFileSync(
@@ -229,6 +233,7 @@ describe('starlog facts authoring (add / policy) e2e', () => {
     delete childEnv.STARLOG_PRIVATE_FACTS;
     delete childEnv.STARLOG_API_KEY;
     delete childEnv.STARLOG_POLICY;
+    childEnv.STARLOG_NO_NUDGE = '1';
     Object.assign(childEnv, env ?? {});
     try {
       const stdout = execFileSync('node', [join(REPO, 'dist/cli.js'), '--no-telemetry', 'facts', ...args], {
@@ -391,5 +396,71 @@ describe('starlog facts authoring (add / policy) e2e', () => {
     expect(vet.status).toBe(0);
     expect(vet.stdout).toContain('## @acme/unset (npm)');
     expect(vet.stdout).toContain('**License:** MIT');
+  });
+});
+
+/**
+ * Self-heal init nudge (e2e) — the install-≠-wired gap. A first user ran
+ * `npm i starloghq` then drove the CLI through their agent without ever running
+ * `starlog init`; the MCP tools were never registered. When settings.json exists
+ * but lacks starlog, a single stderr line steers them to `starlog init`.
+ *
+ * Hermetic via HOME override: os.homedir() honours $HOME on POSIX, so we point it
+ * at a temp dir with a controlled ~/.claude/settings.json and assert the CLI's
+ * real reading of it. STARLOG_NO_NUDGE: '' opts back in (the harness defaults it on).
+ */
+describe('starlog facts CLI — self-heal init nudge (e2e)', () => {
+  let home: string | null = null;
+
+  function writeHomeSettings(settings: unknown | null): string {
+    home = mkdtempSync(join(tmpdir(), 'starlog-nudge-home-'));
+    if (settings !== null) {
+      const claudeDir = join(home, '.claude');
+      mkdirSync(claudeDir, { recursive: true });
+      writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify(settings), 'utf8');
+    }
+    return home;
+  }
+
+  // The nudge writes to STDERR on a clean (exit-0) miss. runFacts() above only
+  // captures stderr on a NON-zero exit (execFileSync returns stdout only), so it
+  // can't see a success-path nudge — use spawnSync, which captures both streams
+  // regardless of exit code. STARLOG_NO_NUDGE is left UNSET here so the nudge can
+  // fire; HOME points os.homedir() at our controlled ~/.claude/settings.json.
+  function runRawFacts(args: string[], home: string): { status: number; stderr: string } {
+    const env: Record<string, string | undefined> = { ...process.env };
+    delete env.STARLOG_PRIVATE_FACTS;
+    delete env.STARLOG_API_KEY;
+    delete env.STARLOG_POLICY;
+    delete env.STARLOG_NO_NUDGE;
+    env.HOME = home;
+    const r = spawnSync('node', [CLI, '--no-telemetry', 'facts', ...args], { cwd: REPO, encoding: 'utf8', env });
+    return { status: r.status ?? -1, stderr: r.stderr ?? '' };
+  }
+
+  afterEach(() => {
+    if (home) rmSync(home, { recursive: true, force: true });
+    home = null;
+  });
+
+  it('fires when settings.json exists but has no starlog MCP server (unwired user)', () => {
+    const h = writeHomeSettings({ mcpServers: { other: {} }, hooks: {} });
+    const { status, stderr } = runRawFacts(['no-such-pkg-xyz'], h);
+    expect(status).toBe(0);
+    expect(stderr).toContain('starlog init');
+  });
+
+  it('stays silent when starlog IS wired into settings.json', () => {
+    const h = writeHomeSettings({ mcpServers: { starlog: { command: 'node', args: ['x'] } } });
+    const { status, stderr } = runRawFacts(['no-such-pkg-xyz'], h);
+    expect(status).toBe(0);
+    expect(stderr).not.toContain('starlog init');
+  });
+
+  it('stays silent when there is no settings.json at all (ambiguous — never nudge on a guess)', () => {
+    const h = writeHomeSettings(null);
+    const { status, stderr } = runRawFacts(['no-such-pkg-xyz'], h);
+    expect(status).toBe(0);
+    expect(stderr).not.toContain('starlog init');
   });
 });

@@ -135,3 +135,15 @@ export function setTelemetryEnabled(enabled: boolean): void {
   const s = readState();
   writeState({ ...s, enabled });
 }
+
+/**
+ * The anonymous id to relay to the hosted API (header `X-Starlog-Anon-Id`) so
+ * the server can alias this CLI install to the GitHub person at key issuance.
+ * Returns null when telemetry is disabled — same opt-out contract as every
+ * other event (DO_NOT_TRACK / STARLOG_TELEMETRY=0 / CI / test), so an opted-out
+ * user relays nothing.
+ */
+export function telemetryAnonId(): string | null {
+  const s = readState();
+  return resolveEnabled(s, false) ? s.anonymousId : null;
+}
