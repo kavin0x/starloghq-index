@@ -2,13 +2,14 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
-## Unreleased
+## 0.4.0
 
 First-real-user fixes: a tester ran `npm i starloghq` and drove the CLI through their agent **without ever running `starlog init`**, so the MCP tools were never registered (the agent fell back to shelling the CLI), and they judged the tool on a mainstream public stack where most vetting honestly returns *"no facts on file."* These changes close the install-≠-wired gap and turn the two dead-end messages into pointers — without overclaiming public-package coverage (the value remains private/internal packages + post-cutoff advisories).
 
 ### Added
 - **Post-install nudge.** `npm i starloghq` now prints one line — *"run `npx starlog init` to wire your AI agent — install alone does nothing"* — because install registers no MCP server or hook on its own. Stays silent in CI / non-interactive / piped installs and never fails the install. (P0)
 - **CLI self-heal nudge.** When `starlog search` / `starlog facts` runs but `~/.claude/settings.json` exists *without* a `starlog` MCP server (a confirmed agent user who skipped `init`), a single stderr line points at `starlog init`. Conservative by design: silent when settings.json is absent/invalid (ambiguous) and suppressible with `STARLOG_NO_NUDGE`. (P0)
+- **Anonymous key↔issuance link (opt-out aware).** Keyed `facts` API requests now relay an anonymous CLI id (`X-Starlog-Anon-Id`) so the server can associate a key with its issuance. The header is omitted entirely under `DO_NOT_TRACK` / `STARLOG_TELEMETRY=0` / CI / tests, and never carries queries, file paths, or package names.
 
 ### Changed
 - **"No facts on file" now converts instead of dead-ending.** The miss message explains that a blank for a *mainstream public* package is expected (your model already knows it; Starlog's edge is post-cutoff advisories + your private packages), points to `npm audit`/OSV for mainstream vetting, and shows the one-liner to teach Starlog an internal package. Shared by the CLI and the `starlog_facts` MCP tool. (P1)
