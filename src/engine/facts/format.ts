@@ -7,7 +7,14 @@ import type { FactView } from './compose.js';
  */
 export function formatFactView(query: string, view: FactView | null): string {
   if (!view) {
-    return `No facts on file for "${query}". Starlog has no verified capability, vulnerability, license, or maintenance record for this package.`;
+    return (
+      `No facts on file for "${query}". Starlog has no verified capability, vulnerability, license, ` +
+      `or maintenance record for this package — which is expected for a mainstream public package ` +
+      `(your training data likely already covers it; Starlog's edge is post-cutoff advisories and your ` +
+      `org's private/internal packages). For a mainstream library, verify the usual way: npm audit / OSV / the repo. ` +
+      `Only if "${query}" is one of your org's own internal packages, teach Starlog: ` +
+      `starlog facts add <package> --status active --license <SPDX>.`
+    );
   }
 
   const lines: string[] = [];

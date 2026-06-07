@@ -15,8 +15,9 @@ function formatResults(query: string, results: QueryResult[]): string {
   const categories = KnownCategorySchema.options.join(', ');
 
   if (results.length === 0) {
-    return `No strong match for "${query}" in the local index, which covers: ${categories}. ` +
-      `This capability may be outside the indexed corpus -- do not present a forced match as a recommendation.`;
+    return `No strong match for "${query}" in the local index. Discovery covers these JS/TS capabilities: ${categories}. ` +
+      `This capability may be outside the indexed corpus (e.g. a non-JS/TS stack) -- do not present a forced match as a recommendation. ` +
+      `You can still vet any named package with starlog_facts.`;
   }
 
   const lines: string[] = [];
