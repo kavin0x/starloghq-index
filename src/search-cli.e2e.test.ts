@@ -196,17 +196,18 @@ describe('starlog search CLI (e2e, spawned binary) — local keyword search', ()
     expect(typeof arr[0].relevance_score).toBe('number');
   });
 
-  // KNOWN BUG (living marker): `search --format json` on a no-match currently emits
-  // EMPTY stdout instead of a parseable `[]`. This `it.fails` asserts the DESIRED
-  // behavior — it PASSES today because the body throws (JSON.parse('') on empty
-  // stdout), and FLIPS to a real failure the moment the product is fixed, signaling
-  // "drop .fails — this is now a regression test." See the suspected-bugs report.
-  it.fails('--format json should emit a parseable [] on a no-match (currently empty stdout)', () => {
+  // REGRESSION (#20): `search --format json` on a no-match emits a parseable `[]`
+  // to stdout (it used to emit EMPTY stdout, which crashed `... --format json | jq`
+  // on every miss). The human guidance stays on stderr. This was an `it.fails`
+  // living marker until the fix landed; it is now a normal regression test.
+  it('--format json emits a parseable [] on a no-match (stdout stays valid JSON)', () => {
     const dir = newTmpDir();
     const miss = runSearch(['zzqqxx nonexistent capability foobar', '--format', 'json'], { cwd: dir });
-    const parsed = JSON.parse(miss.stdout); // throws today (empty stdout) -> it.fails passes
+    const parsed = JSON.parse(miss.stdout); // valid JSON now (was empty stdout pre-fix)
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed).toHaveLength(0);
+    // The guidance is still on stderr, never mixed into the JSON on stdout.
+    expect(miss.stderr).toContain('No strong match in the local index');
   });
 
   // 5. ADVERSARIAL — corrupt/invalid private corpus + empty/whitespace queries all
