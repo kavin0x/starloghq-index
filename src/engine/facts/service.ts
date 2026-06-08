@@ -126,8 +126,12 @@ export function buildComposeDeps(env: NodeJS.ProcessEnv = process.env): ServiceD
 /** Resolve a free-text query to a composed FactView (LOCAL-only, sync), or null. */
 export function lookupFactView(query: string, deps: ServiceDeps): FactView | null {
   const pkg = resolvePackage(query, deps.resolverKeys);
-  if (!pkg) return null;
-  return composeFact(pkg, deps);
+  // If the name resolves to an L1/L2 record, compose against that key. If it does
+  // NOT resolve, still compose against the raw query so a standing package-only
+  // policy verdict (a policy-only ban with no facts record) can surface (#21)
+  // instead of silently no-opping; composeFact returns null when there is neither
+  // a facts record nor a matching standing verdict.
+  return composeFact(pkg ?? query, deps);
 }
 
 export interface ServeDeps {

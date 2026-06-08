@@ -106,10 +106,11 @@ describe('starlog facts authoring + policy + overlay robustness (e2e, spawned bi
   });
 
   // ---------------------------------------------------------------------------
-  // AUTH-03 footgun: a policy verdict with NO accompanying L1/L2 record is
-  // invisible to the agent. Adding a record makes the same verdict surface.
+  // #21 (was the AUTH-03 footgun): a policy verdict with NO accompanying L1/L2
+  // record used to be invisible to the agent (a silent no-op). It now surfaces as
+  // a standing verdict, and still composes onto a later facts record.
   // ---------------------------------------------------------------------------
-  it('policy-only ban with no L1/L2 record silently does NOT reach the agent (AUTH-03 footgun)', () => {
+  it('a policy-only DENY surfaces the verdict, then composes onto a later facts record (#21)', () => {
     const dir = newTmpDir();
     const privPath = join(dir, '.starlog', 'private-facts.json');
     const polPath = join(dir, '.starlog', 'policy.json');
@@ -125,20 +126,17 @@ describe('starlog facts authoring + policy + overlay robustness (e2e, spawned bi
       'Set org verdict DENY for @acme/internal-tool',
     );
 
-    // 2. Vet with ONLY the policy set: the verdict is a silent no-op because
-    //    there is no L1/L2 record for it to attach to. The agent sees the honest
-    //    miss message and — critically — NOT the DENY. This is the AUTH-03
-    //    footgun: a security engineer who runs only `facts policy <pkg> deny`
-    //    believes the ban is live, but it never reaches the agent.
+    // 2. Vet with ONLY the policy set (no L1/L2 record yet): the standing verdict
+    //    now REACHES the agent (#21) — a policy-only DENY is no longer a silent
+    //    no-op. The heading + Org policy line render; with no record the overlay
+    //    block reports "none on file" rather than the bare "No facts on file" miss.
     const vet1 = runFactsInDir(dir, ['@acme/internal-tool'], {
       STARLOG_POLICY: polPath,
     });
     expect(vet1.status).toBe(0);
-    // The package has no L1/L2 record, so the vet is the honest miss. We do NOT
-    // assert the verdict is ABSENT here — that would enshrine the footgun and go red
-    // if the product is fixed to surface policy-only bans. The desired behavior is
-    // pinned by the it.fails living marker below.
-    expect(vet1.stdout).toContain('No facts on file for "@acme/internal-tool"');
+    expect(vet1.stdout).toContain('## @acme/internal-tool (npm)');
+    expect(vet1.stdout).toContain('**Org policy:** DENY — banned (rule pkg-@acme/internal-tool)');
+    expect(vet1.stdout).not.toContain('No facts on file');
 
     // 3. Author a minimal record so the package resolves.
     const add = runFactsInDir(
@@ -163,19 +161,6 @@ describe('starlog facts authoring + policy + overlay robustness (e2e, spawned bi
     // Both files landed under TEMP/.starlog/ (no repo-tree pollution).
     expect(() => readFileSync(polPath, 'utf8')).not.toThrow();
     expect(() => readFileSync(privPath, 'utf8')).not.toThrow();
-  });
-
-  // KNOWN FOOTGUN (living marker): a policy-only DENY (no L1/L2 record) is currently a
-  // silent no-op — the verdict never reaches the agent's vet output. This `it.fails`
-  // asserts the DESIRED behavior (the DENY is visible even without an authored record);
-  // it PASSES today because the body fails, and FLIPS to a real failure if/when the
-  // product surfaces policy-only bans. Reported in the suspected-bugs report.
-  it.fails('a policy-only DENY (no facts record) should still reach the agent', () => {
-    const dir = newTmpDir();
-    const polPath = join(dir, '.starlog', 'policy.json');
-    runFactsInDir(dir, ['policy', '@acme/ghost', 'deny', '--reason', 'banned'], { STARLOG_POLICY: polPath });
-    const vet = runFactsInDir(dir, ['@acme/ghost'], { STARLOG_POLICY: polPath });
-    expect(vet.stdout).toContain('DENY'); // fails today (silent no-op) -> it.fails passes
   });
 
   // ---------------------------------------------------------------------------

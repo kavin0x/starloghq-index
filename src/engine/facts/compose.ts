@@ -25,16 +25,41 @@ export interface ComposeDeps {
 }
 
 /**
- * Compose the three layers for one package. Returns null only when NEITHER L1
- * nor L2 has anything — i.e. a genuine "no facts on file". An L3 verdict is
- * always computed (default 'none'); policy never invents facts, it only judges
- * the ones L1/L2 provide.
+ * Compose the three layers for one package. Returns a view when L1 or L2 has
+ * something, OR when the org has a STANDING package-targeted verdict on the name
+ * (a policy-only ban) — so a `facts policy <pkg> deny` reaches the agent instead
+ * of silently no-opping (#21). Returns null only when there are no facts AND no
+ * standing verdict — a genuine "no facts on file". This still honors the
+ * no-collapse invariant: layers are joined by reference, never merged, and policy
+ * never invents L1/L2 facts (the returned l1/l2 stay null in the policy-only case).
  */
 export function composeFact(pkg: string, deps: ComposeDeps): FactView | null {
   const l1 = deps.l1Lookup(pkg);
   const l2 = deps.l2Source.lookup(pkg, l1?.ecosystem);
-  if (!l1 && !l2) return null;
-  const ecosystem: Ecosystem = l1?.ecosystem ?? l2?.ecosystem ?? 'npm';
   const l3 = evaluatePolicy(deps.policy, { l1, l2 });
-  return { package: l1?.package ?? l2?.package ?? pkg, ecosystem, l1, l2, l3 };
+  if (l1 || l2) {
+    const ecosystem: Ecosystem = l1?.ecosystem ?? l2?.ecosystem ?? 'npm';
+    return { package: l1?.package ?? l2?.package ?? pkg, ecosystem, l1, l2, l3 };
+  }
+
+  // No L1/L2 facts. evaluatePolicy() above returned 'none' because rule matching
+  // derives the package name from l1/l2 — both null here, so a package-keyed rule
+  // can't fire. But a standing verdict that targets this name BY PACKAGE ALONE is
+  // a deliberate org ruling (a ban with no accompanying record) and must still
+  // surface. Rules keyed on l2 fields (license_risk, maintenance, vulns) need an
+  // overlay to judge, so only a package-only rule can fire on a no-facts package.
+  const standing = deps.policy?.rules.find(
+    (r) => r.match.package === pkg && Object.keys(r.match).length === 1,
+  );
+  if (standing) {
+    return {
+      package: pkg,
+      ecosystem: 'npm', // no L1/L2 to source an ecosystem from; default like above
+      l1: null,
+      l2: null,
+      l3: { decision: standing.decision, rule_id: standing.id, rationale: standing.rationale },
+    };
+  }
+
+  return null;
 }
