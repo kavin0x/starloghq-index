@@ -145,6 +145,11 @@ program
         `No strong match in the local index. Discovery covers these JS/TS capabilities: ${VALID_CATEGORIES.join(', ')}.\n` +
         `If your stack is non-JS/TS, search has no candidates to surface — but \`starlog facts <package>\` still vets any package by name, and \`starlog corpus add <pkg> --solves "…"\` makes your internal packages discoverable here.`,
       );
+      // JSON consumers asked for JSON: emit an empty array to stdout so a
+      // `starlog search ... --format json | jq` pipeline gets valid JSON on a
+      // miss instead of an empty stream (JSON.parse('') throws). The human
+      // guidance above stays on stderr, where jq never reads. (#20)
+      if (opts.format === 'json') console.log(formatJSON([]));
       await nudgeInitIfUnwired(opts.format);
       process.exit(0);
     }
