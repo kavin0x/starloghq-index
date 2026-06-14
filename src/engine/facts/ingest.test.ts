@@ -9,6 +9,7 @@ import {
   packageIdentityFromManifest,
   buildDerivedL2,
   deriveL2FromCheckout,
+  suggestL3Rules,
 } from './ingest.js';
 import { upsertL2Entry } from './authoring.js';
 import { parseOverlay } from './l2-source.js';
@@ -100,6 +101,38 @@ describe('buildDerivedL2', () => {
     expect(() =>
       buildDerivedL2({ package: 'p', license: 'MIT', maintenance: 'active', fetchedAt: 'yesterday' }),
     ).toThrow(/fetched_at/i);
+  });
+});
+
+describe('suggestL3Rules', () => {
+  const base = { package: 'p', license: 'MIT', maintenance: 'active' as const, fetchedAt: '2026-06-10' };
+
+  it('suggests nothing for a clean overlay (permissive license, active, no vulns)', () => {
+    expect(suggestL3Rules(buildDerivedL2(base))).toEqual([]);
+  });
+
+  it('always suggests flag (conservative), never deny', () => {
+    const o = buildDerivedL2({ ...base, license: 'GPL-3.0-only', maintenance: 'abandoned' });
+    const rules = suggestL3Rules(o);
+    expect(rules.length).toBeGreaterThan(0);
+    expect(rules.every((r) => r.decision === 'flag')).toBe(true);
+  });
+
+  it('flags an abandoned or deprecated package on a maintenance signal', () => {
+    for (const m of ['abandoned', 'deprecated'] as const) {
+      const rules = suggestL3Rules(buildDerivedL2({ ...base, maintenance: m }));
+      expect(rules.some((r) => r.signal === `maintenance: ${m}`)).toBe(true);
+    }
+  });
+
+  it('flags strong copyleft and unknown licenses on a license signal', () => {
+    expect(suggestL3Rules(buildDerivedL2({ ...base, license: 'AGPL-3.0-only' })).some((r) => r.signal === 'license_risk: copyleft-strong')).toBe(true);
+    expect(suggestL3Rules(buildDerivedL2({ ...base, license: 'UNLICENSED' })).some((r) => r.signal === 'license_risk: unknown')).toBe(true);
+  });
+
+  it('flags a package with known vulns/incidents', () => {
+    const o = buildDerivedL2({ ...base, knownVulns: [{ id: 'INCIDENT:x', severity: 'high', affected: '*', summary: 's' }] });
+    expect(suggestL3Rules(o).some((r) => r.signal === 'has_known_vulns')).toBe(true);
   });
 });
 

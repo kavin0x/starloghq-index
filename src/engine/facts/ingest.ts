@@ -108,6 +108,35 @@ export function buildDerivedL2(input: DerivedL2Input): L2Overlay {
   return r.data;
 }
 
+export interface SuggestedRule {
+  decision: 'flag';
+  signal: string;
+  rationale: string;
+}
+
+/**
+ * PREVIEW → SHIPPED: turn the REAL L2 signals into candidate L3 rules. Conservative
+ * by design — always 'flag', never auto-'deny' (a deny is the org's deliberate call,
+ * never a derived default). These are PROPOSALS; the caller decides whether to apply
+ * them, preserving the no-collapse invariant (policy is org-owned).
+ */
+export function suggestL3Rules(overlay: L2Overlay): SuggestedRule[] {
+  const out: SuggestedRule[] = [];
+  if (overlay.maintenance === 'deprecated' || overlay.maintenance === 'abandoned') {
+    out.push({ decision: 'flag', signal: `maintenance: ${overlay.maintenance}`, rationale: `Internal package is ${overlay.maintenance}; assign an owner or migrate off it.` });
+  }
+  if (overlay.license_risk === 'copyleft-strong') {
+    out.push({ decision: 'flag', signal: 'license_risk: copyleft-strong', rationale: `${overlay.license} is strong copyleft; legal review before shipping in a proprietary product.` });
+  }
+  if (overlay.license_risk === 'unknown') {
+    out.push({ decision: 'flag', signal: 'license_risk: unknown', rationale: 'No clear license; resolve licensing before depending on this internally.' });
+  }
+  if (overlay.known_vulns.length > 0) {
+    out.push({ decision: 'flag', signal: 'has_known_vulns', rationale: 'Known vulnerabilities/incidents on file; review before use.' });
+  }
+  return out;
+}
+
 export interface DeriveOptions {
   /** Injected ISO date (YYYY-MM-DD). */
   fetchedAt: string;

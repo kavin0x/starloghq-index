@@ -17,6 +17,10 @@ import {
   upsertManifestEntry,
   buildL3Rule,
   upsertPolicy,
+  discoverCheckouts,
+  syncCheckouts,
+  gitLastCommitDaysAgo,
+  today,
   L2OverlaySchema,
   L3PolicySchema,
   type L2Overlay,
@@ -269,6 +273,10 @@ facts
 // shapes loadPrivateFacts / loadPolicy read back.
 const DEFAULT_PRIVATE_FACTS = '.starlog/private-facts.json';
 const DEFAULT_POLICY = '.starlog/policy.json';
+// `org sync` writes its suggested verdicts HERE, NOT to DEFAULT_POLICY — the
+// agent does not read this file, so derived flags are proposals (review-then-
+// apply), never auto-applied to the live policy. Regenerated fresh each sync.
+const DEFAULT_SUGGESTED_POLICY = '.starlog/policy.suggested.json';
 
 /** ENOENT-tolerant JSON read: missing file → null; malformed JSON → throws
  *  (SyntaxError → fail() prints the "invalid JSON — fix or remove" message,
@@ -440,6 +448,66 @@ facts
     await track('cli_facts_push', { l2_count: overlays.length, policy: pushedPolicy }, { noTelemetry: noTelemetry() });
     console.log(`Pushed ${res.count ?? overlays.length} L2 overlay(s)${pushedPolicy ? ' + org policy' : ''} to the hosted facts API.`);
   }));
+
+// ── org: bulk-ingest a directory of internal checkouts ────────────────────────
+// `starlog org sync <dir>` walks a directory of checked-out repos, derives an L2
+// overlay per published package (source never leaves the machine), suggests org
+// policy from the real signals, and writes the same local artifacts `facts add` /
+// `facts policy` produce — merging over any existing ones. This is the runnable
+// Phase-1 spine; GitHub enumeration bolts onto the front later.
+const org = program
+  .command('org')
+  .description('Bulk-ingest your org: derive facts for many internal packages at once');
+
+org
+  .command('sync <dir>')
+  .description('Scan a directory of checked-out repos and derive/refresh their private facts (+ suggested policy)')
+  .option('--facts-out <path>', 'Where to write the private L2 facts', DEFAULT_PRIVATE_FACTS)
+  .option('--policy-out <path>', 'Where to write SUGGESTED L3 rules (a proposal file the agent does not read)', DEFAULT_SUGGESTED_POLICY)
+  .option('--no-git', 'Skip git last-commit detection (maintenance falls back to active)')
+  .action(
+    action('org sync failed', async (dir: string, opts: { factsOut: string; policyOut: string; git: boolean }) => {
+      const dirs = discoverCheckouts(dir);
+      if (dirs.length === 0) {
+        console.error(`org sync: no checkouts found under ${dir} (looked for immediate subdirectories containing a package.json).`);
+        process.exit(1);
+      }
+
+      const now = Date.now();
+      const checkouts = dirs.map((d) => ({
+        dir: d,
+        lastCommitDaysAgo: opts.git ? gitLastCommitDaysAgo(d, now) : null,
+      }));
+
+      // L2 facts merge over the existing file so hand-authored facts are preserved
+      // (upsert replaces per package). Policy suggestions are regenerated FRESH (no
+      // seed) so a fixed package stops being flagged, and they go to a SEPARATE file
+      // the agent does not read — proposals, not auto-applied.
+      const seedFacts = readJsonIfPresent(opts.factsOut) as { l1?: unknown[]; l2?: unknown[] } | null;
+
+      const res = syncCheckouts(checkouts, { fetchedAt: today(), seedFacts });
+
+      await atomicWrite(opts.factsOut, JSON.stringify(res.privateFacts, null, 2) + '\n');
+      // Always (re)write the suggestion file so stale flags are dropped on re-sync.
+      const suggested = res.policy ?? { org: 'local', rules: [] };
+      await atomicWrite(opts.policyOut, JSON.stringify(suggested, null, 2) + '\n');
+
+      const flagged = res.derived.filter((d) => d.flagged).length;
+      await track(
+        'cli_org_sync',
+        { scanned: dirs.length, derived: res.derived.length, skipped: res.skipped.length, flagged },
+        { noTelemetry: noTelemetry() },
+      );
+
+      console.log(`Scanned ${dirs.length} checkout(s): derived ${res.derived.length} package fact(s), skipped ${res.skipped.length} (no published name).`);
+      console.log(`Wrote ${res.privateFacts.l2.length} L2 overlay(s) to ${opts.factsOut} — your agent reads these after \`starlog init\`.`);
+      if (flagged > 0) {
+        console.log(`Suggested ${flagged} policy flag(s) → ${opts.policyOut} (PROPOSALS — the agent does NOT read this file). Review it, then apply the ones you trust with \`starlog facts policy <pkg> flag\`.`);
+      } else {
+        console.log(`No policy flags suggested — wrote an empty proposal to ${opts.policyOut}.`);
+      }
+    }),
+  );
 
 // ── corpus: org-private DISCOVERY authoring ───────────────────────────────────
 // Mirror of `facts add` for the OTHER private overlay: `facts add` makes an
