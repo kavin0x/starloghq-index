@@ -65,12 +65,14 @@ This wires Starlog into Claude Code (and drops instruction files for Cursor, Cop
 - **PostToolUse hook** installed — surfaces a package's facts on install
 - Previews every change and asks before writing; **idempotent** and safe to re-run
 
-Install globally so the `starlog` command is always on your PATH:
+Prefer a bare `starlog` command over typing `npx`? Install it globally:
 
 ```bash
 npm install -g starloghq
 starlog init
 ```
+
+> If `starlog` then reports **`command not found`**, your npm global bin directory isn't on your `PATH` (a common npm setup gap — not a Starlog issue). Either run `export PATH="$(npm prefix -g)/bin:$PATH"` (add it to your shell profile to persist), or just keep using `npx starloghq init` / `npx starloghq facts <pkg>`, which always work without any PATH setup. If the install itself printed an `EACCES`/permission error, it didn't complete — fix your npm prefix or use `npx`.
 
 Add `--project` to also drop Starlog guidance into your project's `CLAUDE.md`; preview without writing, or remove cleanly:
 
