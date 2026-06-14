@@ -473,7 +473,7 @@ org
     action('org sync failed', async (dir: string, opts: { factsOut: string; corpusOut: string; policyOut: string; git: boolean }) => {
       const dirs = discoverCheckouts(dir);
       if (dirs.length === 0) {
-        console.error(`org sync: no checkouts found under ${dir} (looked for immediate subdirectories containing a package.json).`);
+        console.error(`org sync: no checkouts found under ${dir} (looked for immediate subdirectories containing a package.json or pyproject.toml).`);
         process.exit(1);
       }
 
