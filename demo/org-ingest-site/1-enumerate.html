@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enumerate the private org · Starlog org-ingest</title>
+<link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
+  <span class="asof">generated 2026-06-10 · real output from <code>src/engine/facts</code></span>
+</header>
+<nav class="stepper"><a class="navlink" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" aria-current="page" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
+<main>
+  <h1><span class="hn">1</span>Enumerate the private org</h1>
+  
+<p class="lead"><span class="badge planned">PLANNED</span> The first phase installs a GitHub App (or a fine-grained PAT) and lists the org's repos with the metadata the later stages need: the <code class="k">archived</code> flag and last-commit recency feed the maintenance call; source itself never leaves the runner.</p>
+<div class="card">
+  <table><thead><tr><th>repo</th><th>state</th><th>last commit</th><th>manifest name</th></tr></thead><tbody><tr>
+    <td class="mono">acme/auth-tokens</td>
+    <td><span class="pill active">active</span></td>
+    <td class="mono">12d</td>
+    <td class="mono">@acme/auth-tokens</td>
+  </tr><tr>
+    <td class="mono">acme/billing-legacy</td>
+    <td><span class="pill dep">archived</span></td>
+    <td class="mono">540d</td>
+    <td class="mono">@acme/billing-legacy</td>
+  </tr><tr>
+    <td class="mono">acme/data-pipeline</td>
+    <td><span class="pill active">active</span></td>
+    <td class="mono">700d</td>
+    <td class="mono">@acme/data-pipeline</td>
+  </tr><tr>
+    <td class="mono">acme/ui-kit</td>
+    <td><span class="pill active">active</span></td>
+    <td class="mono">200d</td>
+    <td class="mono">@acme/ui-kit</td>
+  </tr><tr>
+    <td class="mono">acme/internal-scripts</td>
+    <td><span class="pill active">active</span></td>
+    <td class="mono">30d</td>
+    <td class="mono"><span class="pill skip">private / no name</span></td>
+  </tr></tbody></table>
+</div>
+<div class="note"><b>Source residency:</b> enumeration reads metadata only. Derivation (next stages) happens on a local checkout / CI runner — Starlog pushes <i>derived facts</i>, never your code.</div>
+  <div class="pager"><a class="pg prev" href="index.html">← Overview</a><a class="pg next" href="2-identify.html">Identify →</a></div>
+</main>
+<footer class="foot">
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today ·
+  <span class="badge preview">PREVIEW</span> logic shown, not yet a CLI command ·
+  <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
+</footer>
+</body></html>

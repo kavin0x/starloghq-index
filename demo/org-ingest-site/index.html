@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Org-ingest, end to end · Starlog org-ingest</title>
+<link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
+  <span class="asof">generated 2026-06-10 · real output from <code>src/engine/facts</code></span>
+</header>
+<nav class="stepper"><a class="navlink" aria-current="page" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
+<main>
+  <h1>Org-ingest, end to end</h1>
+  
+<p class="lead">An org has hundreds of internal repos. Nobody is going to hand-author facts for each one. This walkthrough runs the <b>shipped</b> derive + serve code against a fixture private org <code class="k">acme</code> and shows the real output at every stage — so an AI coding agent vets your internal packages the same way it vets public ones.</p>
+<div class="flow"><div class="node"><div class="n">step 1</div><div class="t">Enumerate</div><span class="badge planned">PLANNED</span></div><div class="arrow">→</div><div class="node"><div class="n">step 2</div><div class="t">Identify</div><span class="badge shipped">SHIPPED</span></div><div class="arrow">→</div><div class="node"><div class="n">step 3</div><div class="t">Derive L2</div><span class="badge shipped">SHIPPED</span></div><div class="arrow">→</div><div class="node"><div class="n">step 4</div><div class="t">Suggest L3</div><span class="badge preview">PREVIEW</span></div><div class="arrow">→</div><div class="node"><div class="n">step 5</div><div class="t">Emit</div><span class="badge shipped">SHIPPED</span></div><div class="arrow">→</div><div class="node"><div class="n">step 6</div><div class="t">Agent sees</div><span class="badge shipped">SHIPPED</span></div></div>
+<div class="grid two">
+  <div class="card"><h2 style="margin-top:0">This run, by the numbers</h2>
+    <table>
+      <tr><td>Repos enumerated</td><td class="mono">5</td></tr>
+      <tr><td>Resolved to a package</td><td class="mono">4</td></tr>
+      <tr><td>Skipped (no published identity)</td><td class="mono">1</td></tr>
+      <tr><td>L2 overlays derived <span class="badge shipped">SHIPPED</span></td><td class="mono">4</td></tr>
+      <tr><td>Policy verdicts that fired <span class="badge preview">PREVIEW</span></td><td class="mono">2</td></tr>
+    </table>
+  </div>
+  <div class="card"><h2 style="margin-top:0">What's real vs. planned</h2>
+    <ul class="tight">
+      <li><span class="badge shipped">SHIPPED</span> identity, L2 derivation, emit, and the serve path are the <i>actual</i> functions in <code class="k">src/engine/facts</code>.</li>
+      <li><span class="badge preview">PREVIEW</span> the L3 <i>suggester</i> logic is shown here, derived from real L2 signals — not yet a CLI command.</li>
+      <li><span class="badge planned">PLANNED</span> GitHub enumeration and the L1 capability analyzer are the next phase; never faked into the emitted artifacts.</li>
+    </ul>
+    <div class="note">Full plan: <code class="k">.planning/org-ingest-analysis.md</code> — chosen architecture <b>hybrid-local-then-action</b>.</div>
+  </div>
+</div>
+  <div class="pager"><span></span><a class="pg next" href="1-enumerate.html">Enumerate →</a></div>
+</main>
+<footer class="foot">
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today ·
+  <span class="badge preview">PREVIEW</span> logic shown, not yet a CLI command ·
+  <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
+</footer>
+</body></html>

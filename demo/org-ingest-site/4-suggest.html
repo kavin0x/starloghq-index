@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Suggest org policy · Starlog org-ingest</title>
+<link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
+  <span class="asof">generated 2026-06-10 · real output from <code>src/engine/facts</code></span>
+</header>
+<nav class="stepper"><a class="navlink" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" aria-current="page" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
+<main>
+  <h1><span class="hn">4</span>Suggest org policy</h1>
+  
+<p class="lead"><span class="badge preview">PREVIEW</span> A suggester turns the <i>real</i> L2 signals into candidate <code class="k">L3</code> rules — conservative (always <code class="k">flag</code>, never auto-<code class="k">deny</code>). These are <b>proposals for human approval</b>, never auto-applied: the no-collapse invariant means policy is the org's call.</p>
+<div class="card">
+  <table><thead><tr><th>package</th><th>suggested policy</th></tr></thead><tbody><tr><td class="mono">@acme/auth-tokens</td><td><span class="pill none">clean — no rule suggested</span></td></tr><tr><td class="mono">@acme/billing-legacy</td><td><div><span class="pill flag">flag</span> <code class="k">maintenance: deprecated</code><div style="color:var(--mut);margin:2px 0 8px">Internal package is deprecated; assign an owner or migrate off it.</div></div><div><span class="pill flag">flag</span> <code class="k">license_risk: copyleft-strong</code><div style="color:var(--mut);margin:2px 0 8px">GPL-3.0-only is strong copyleft; legal review before shipping in a proprietary product.</div></div></td></tr><tr><td class="mono">@acme/data-pipeline</td><td><div><span class="pill flag">flag</span> <code class="k">maintenance: abandoned</code><div style="color:var(--mut);margin:2px 0 8px">Internal package is abandoned; assign an owner or migrate off it.</div></div><div><span class="pill flag">flag</span> <code class="k">license_risk: unknown</code><div style="color:var(--mut);margin:2px 0 8px">No clear license; resolve licensing before depending on this internally.</div></div></td></tr><tr><td class="mono">@acme/ui-kit</td><td><span class="pill none">clean — no rule suggested</span></td></tr></tbody></table>
+</div>
+<div class="note"><b>Approved rules</b> compile to <code class="k">buildL3Rule()</code> / <code class="k">upsertPolicy()</code> — the same shipped authoring functions <code class="k">starlog facts policy</code> already uses. See the emitted <code class="k">policy.json</code> next.</div>
+  <div class="pager"><a class="pg prev" href="3-derive.html">← Derive L2</a><a class="pg next" href="5-emit.html">Emit →</a></div>
+</main>
+<footer class="foot">
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today ·
+  <span class="badge preview">PREVIEW</span> logic shown, not yet a CLI command ·
+  <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
+</footer>
+</body></html>

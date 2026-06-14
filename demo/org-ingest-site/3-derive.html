@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Derive the L2 overlay · Starlog org-ingest</title>
+<link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
+  <span class="asof">generated 2026-06-10 · real output from <code>src/engine/facts</code></span>
+</header>
+<nav class="stepper"><a class="navlink" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" aria-current="page" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
+<main>
+  <h1><span class="hn">3</span>Derive the L2 overlay</h1>
+  
+<p class="lead"><span class="badge shipped">SHIPPED</span> <code class="k">deriveL2FromCheckout()</code> reads the checkout and produces a schema-valid <code class="k">L2Overlay</code>, stamped <code class="k">source: "analyzer"</code> (the honest provenance label added in the Phase-0 schema change) and a real <code class="k">fetched_at</code> freshness date. Every value below is the function's actual output.</p>
+<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">@acme/auth-tokens</h2><code class="k">analyzer · as of 2026-06-10</code></div>
+      <table>
+        <tr><td>license</td><td class="mono">Apache-2.0</td><td>→ <span class="pill none">none</span></td><td style="color:var(--mut)">Apache-2.0 → none (permissive SPDX → safe to use)</td></tr>
+        <tr><td>maintenance</td><td><span class="pill active">active</span></td><td></td><td style="color:var(--mut)">last commit 12d ago → active</td></tr>
+        <tr><td>known vulns</td><td class="mono">0</td><td colspan="2" style="color:var(--mut)">osv-scanner integration is <span class="badge planned">PLANNED</span> — this slice derives license + maintenance + identity</td></tr>
+      </table>
+      <div class="kv"><span>L1 capabilities <span class="badge planned">PLANNED</span>:</span> <code class="k">auth-path</code> <code class="k">crypto</code> <span>— illustrative; the analyzer is the next phase</span></div>
+    </div><div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">@acme/billing-legacy</h2><code class="k">analyzer · as of 2026-06-10</code></div>
+      <table>
+        <tr><td>license</td><td class="mono">GPL-3.0-only</td><td>→ <span class="pill strong">copyleft-strong</span></td><td style="color:var(--mut)">GPL-3.0-only → copyleft-strong (strong copyleft (GPL/AGPL) → review before proprietary use)</td></tr>
+        <tr><td>maintenance</td><td><span class="pill dep">deprecated</span></td><td></td><td style="color:var(--mut)">repo archived → deprecated</td></tr>
+        <tr><td>known vulns</td><td class="mono">0</td><td colspan="2" style="color:var(--mut)">osv-scanner integration is <span class="badge planned">PLANNED</span> — this slice derives license + maintenance + identity</td></tr>
+      </table>
+      <div class="kv"><span>L1 capabilities <span class="badge planned">PLANNED</span>:</span> <code class="k">network</code> <code class="k">filesystem</code> <span>— illustrative; the analyzer is the next phase</span></div>
+    </div><div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">@acme/data-pipeline</h2><code class="k">analyzer · as of 2026-06-10</code></div>
+      <table>
+        <tr><td>license</td><td class="mono">UNLICENSED</td><td>→ <span class="pill unknown">unknown</span></td><td style="color:var(--mut)">UNLICENSED → unknown (no/unrecognized license → resolve before depending)</td></tr>
+        <tr><td>maintenance</td><td><span class="pill aband">abandoned</span></td><td></td><td style="color:var(--mut)">last commit 700d ago (≥540) → abandoned</td></tr>
+        <tr><td>known vulns</td><td class="mono">0</td><td colspan="2" style="color:var(--mut)">osv-scanner integration is <span class="badge planned">PLANNED</span> — this slice derives license + maintenance + identity</td></tr>
+      </table>
+      <div class="kv"><span>L1 capabilities <span class="badge planned">PLANNED</span>:</span> <code class="k">network</code> <code class="k">child-process</code> <span>— illustrative; the analyzer is the next phase</span></div>
+    </div><div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">@acme/ui-kit</h2><code class="k">analyzer · as of 2026-06-10</code></div>
+      <table>
+        <tr><td>license</td><td class="mono">MIT</td><td>→ <span class="pill none">none</span></td><td style="color:var(--mut)">MIT → none (permissive SPDX → safe to use)</td></tr>
+        <tr><td>maintenance</td><td><span class="pill maint">maintenance-only</span></td><td></td><td style="color:var(--mut)">last commit 200d ago (≥180) → maintenance-only</td></tr>
+        <tr><td>known vulns</td><td class="mono">0</td><td colspan="2" style="color:var(--mut)">osv-scanner integration is <span class="badge planned">PLANNED</span> — this slice derives license + maintenance + identity</td></tr>
+      </table>
+      <div class="kv"><span>L1 capabilities <span class="badge planned">PLANNED</span>:</span> <code class="k">dom</code> <span>— illustrative; the analyzer is the next phase</span></div>
+    </div>
+<div class="note"><b>Why <code class="k">analyzer</code>, not <code class="k">hand</code>:</b> a clone-derived fact must not masquerade as hand-curated. The enum member <code class="k">analyzer</code> was added to <code class="k">@starloghq/facts-schema</code> so the serve path accepts these without a provenance lie.</div>
+  <div class="pager"><a class="pg prev" href="2-identify.html">← Identify</a><a class="pg next" href="4-suggest.html">Suggest L3 →</a></div>
+</main>
+<footer class="foot">
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today ·
+  <span class="badge preview">PREVIEW</span> logic shown, not yet a CLI command ·
+  <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
+</footer>
+</body></html>
