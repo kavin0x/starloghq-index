@@ -74,6 +74,7 @@ describe('syncCheckouts', () => {
     const m = res.corpus.manifests[0];
     expect(m.solves).toBe('scans repos for secrets');
     expect(m.stack_affinity).toEqual(['security']);
+    expect(m.auto_generated).toBe(true); // org-sync derived it — honest provenance
     expect(res.noDescription).toEqual(['@acme/bare']); // derived as a fact, but not discoverable
   });
 

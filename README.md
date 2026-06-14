@@ -82,6 +82,22 @@ starlog init --dry-run
 starlog init --uninstall
 ```
 
+### Onboard a whole org at once
+
+Don't hand-author facts for every internal repo — point Starlog at a directory of checkouts and it derives them in one pass:
+
+```bash
+starlog org sync ~/code/my-org
+```
+
+For each published package it finds (npm `package.json` **and** Python `pyproject.toml`), it derives:
+
+- **L2 facts** → `.starlog/private-facts.json` — license + license risk (from the manifest, or detected from the `LICENSE` file), maintenance from git last-commit recency, stamped `source: analyzer` with a dated `as of`. Your agent **vets these by name**.
+- **Discovery corpus** → `.starlog/private-corpus.json` — captures each manifest's description + keywords so your agent can **find** internal packages by capability via `starlog_search`, not just vet them by name.
+- **Suggested policy** → `.starlog/policy.suggested.json` — flag candidates (e.g. strong-copyleft, no declared license) derived from the signals. These are **proposals the agent does not read** — review them, then adopt the ones you trust with `starlog facts policy <pkg> flag`.
+
+Source never leaves your machine; only derived facts are written. Re-run anytime to refresh (it merges over existing facts and regenerates suggestions). Repos with no published name — or no description — are reported, never fabricated. Known-vulnerability scanning and remote GitHub-org enumeration are on the roadmap.
+
 ### From source
 
 ```bash
