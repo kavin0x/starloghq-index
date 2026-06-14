@@ -2,6 +2,22 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.5.0
+
+Onboard a whole org without hand-authoring a fact per repo. The new `starlog org sync` walks a directory of internal checkouts and **derives** their facts locally — so your AI agent can vet *and* discover your private packages, not just public ones.
+
+### Added
+- **`starlog org sync <dir>`.** Scans immediate subdirectories that are published packages (npm `package.json` **and** Python `pyproject.toml`/PEP 621) and derives, per package: an **L2 facts overlay** (`.starlog/private-facts.json`) with license + `license_risk`, maintenance from git last-commit recency, `attestation.source: "analyzer"` and a dated `fetched_at`; a **discovery corpus** (`.starlog/private-corpus.json`) from each manifest's description + keywords, so `starlog_search` surfaces internal packages by capability; and **suggested L3 policy** (`.starlog/policy.suggested.json`) — flag candidates from the signals, written to a separate proposal file the agent does **not** read (propose-not-apply; a human adopts them). Source never leaves the machine; `--facts-out` / `--corpus-out` / `--policy-out` / `--no-git` available. Repos with no published name (or no description) are reported, never fabricated.
+- **LICENSE-file license detection.** When a manifest declares no license, the license is detected from the repo's `LICENSE`/`COPYING` file (GPL/LGPL/AGPL version-aware, Apache/MIT/MPL/ISC/BSD); unrecognized → `unknown` (never a false `none`).
+- **`analyzer` attestation source.** `@starloghq/facts-schema` gains `'analyzer'` as an L2 `attestation.source`, so clone-derived facts carry honest provenance instead of masquerading as hand-authored. (schema 0.1.0 → 0.2.0)
+- Auto-generated discovery manifests are now labelled `auto_generated: true`, distinguishing them from hand-authored `corpus add` entries.
+
+### Changed
+- **README:** the global-install section no longer over-promises "always on your PATH" — it now notes the `command not found` (PATH) and `EACCES` cases and points to the always-works `npx` path.
+
+### Internal
+- Single L2 construction seam (`assembleL2`) shared by the hand and analyzer paths, replacing a near-duplicate builder.
+
 ## 0.4.0
 
 First-real-user fixes: a tester ran `npm i starloghq` and drove the CLI through their agent **without ever running `starlog init`**, so the MCP tools were never registered (the agent fell back to shelling the CLI), and they judged the tool on a mainstream public stack where most vetting honestly returns *"no facts on file."* These changes close the install-≠-wired gap and turn the two dead-end messages into pointers — without overclaiming public-package coverage (the value remains private/internal packages + post-cutoff advisories).
