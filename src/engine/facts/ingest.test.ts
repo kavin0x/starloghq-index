@@ -17,6 +17,7 @@ import {
   keywordsFromManifest,
   keywordsFromPyproject,
   derivePackageFromCheckout,
+  detectLicenseFromText,
 } from './ingest.js';
 import { upsertL2Entry } from './authoring.js';
 import { parseOverlay } from './l2-source.js';
@@ -202,6 +203,47 @@ describe('derivePackageFromCheckout (facts + discovery in one pass)', () => {
   it('returns null when there is no published identity', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ private: true }));
     expect(derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })).toBeNull();
+  });
+
+  it('falls back to a LICENSE file when the manifest declares no license (fixes the false "unknown")', () => {
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "headless-burp"\n'); // no license field
+    writeFileSync(join(dir, 'LICENSE'), '                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n');
+    const r = derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(r.overlay.license).toBe('GPL-3.0');
+    expect(r.overlay.license_risk).toBe('copyleft-strong');
+  });
+
+  it('still UNLICENSED when neither the manifest nor a LICENSE file declares one', () => {
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "armeyes"\n');
+    const r = derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(r.overlay.license).toBe('UNLICENSED');
+  });
+
+  it('the manifest license wins over a LICENSE file when both are present', () => {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/x', license: 'MIT' }));
+    writeFileSync(join(dir, 'LICENSE'), 'GNU GENERAL PUBLIC LICENSE\nVersion 3');
+    expect(derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })!.overlay.license).toBe('MIT');
+  });
+});
+
+describe('detectLicenseFromText (LICENSE-file fallback)', () => {
+  it('identifies the GPL/LGPL/AGPL family, version-aware, without confusing them', () => {
+    expect(detectLicenseFromText('                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n')).toBe('GPL-3.0');
+    expect(detectLicenseFromText('GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991')).toBe('GPL-2.0');
+    expect(detectLicenseFromText('GNU LESSER GENERAL PUBLIC LICENSE\nVersion 3')).toBe('LGPL-3.0');
+    expect(detectLicenseFromText('GNU AFFERO GENERAL PUBLIC LICENSE\nVersion 3')).toBe('AGPL-3.0');
+  });
+
+  it('identifies common permissive licenses', () => {
+    expect(detectLicenseFromText('Apache License\nVersion 2.0, January 2004')).toBe('Apache-2.0');
+    expect(detectLicenseFromText('MIT License\n\nPermission is hereby granted, free of charge, to any person')).toBe('MIT');
+    expect(detectLicenseFromText('Mozilla Public License Version 2.0')).toBe('MPL-2.0');
+  });
+
+  it('returns null for empty or unrecognizable text (never a false positive)', () => {
+    expect(detectLicenseFromText(null)).toBeNull();
+    expect(detectLicenseFromText('')).toBeNull();
+    expect(detectLicenseFromText('Copyright 2026 Acme. All rights reserved.')).toBeNull();
   });
 });
 

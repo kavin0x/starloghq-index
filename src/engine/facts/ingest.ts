@@ -1,15 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Ecosystem, L2Overlay, Vuln } from '@starloghq/facts-schema';
 import { assembleL2 } from './authoring.js';
 
 /**
- * INGEST primitives — the first slice of org-ingest (see .planning/org-ingest-analysis.md):
- * derive a schema-valid L2 overlay for ONE published package from a local checkout,
- * stamped with the honest attestation.source 'analyzer' (NOT 'hand', which buildL2FromInput
- * hardcodes). Pure, deterministic helpers + one thin checkout reader; no network, no LLM,
- * source never leaves the machine. Vuln/transitive_risk (osv-scanner) and LICENSE-file
- * detection (licensee) are deliberately deferred to a follow-up — this proves the emit seam.
+ * INGEST primitives — the org-ingest derivation layer (see .planning/org-ingest-analysis.md):
+ * derive a schema-valid L2 overlay (+ discovery signals) for ONE published package from a
+ * local checkout, stamped with the honest attestation.source 'analyzer' (NOT 'hand', which
+ * buildL2FromInput hardcodes). Pure, deterministic helpers + thin checkout readers; no
+ * network, no LLM, source never leaves the machine. Vuln/transitive_risk (osv-scanner) is
+ * still deferred to a follow-up.
  */
 
 export type LicenseRisk = L2Overlay['license_risk'];
@@ -255,6 +255,38 @@ function readTextIfPresent(path: string): string | null {
   }
 }
 
+/**
+ * Identify an SPDX license from the TEXT of a LICENSE file by its well-known header.
+ * Conservative: returns null on anything unrecognized (never a false positive). The
+ * GPL family is version-aware and ordered so AGPL/LGPL are matched before bare GPL
+ * (both contain "general public license").
+ */
+export function detectLicenseFromText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const head = text.slice(0, 3000);
+  if (/affero general public license/i.test(head)) return 'AGPL-3.0';
+  if (/lesser general public license/i.test(head)) return 'LGPL-3.0';
+  if (/general public license/i.test(head)) return /version 2/i.test(head) ? 'GPL-2.0' : 'GPL-3.0';
+  if (/apache license/i.test(head)) return 'Apache-2.0';
+  if (/mozilla public license/i.test(head)) return 'MPL-2.0';
+  if (/\bISC License\b/i.test(head)) return 'ISC';
+  if (/\bMIT License\b/i.test(head) || /permission is hereby granted, free of charge/i.test(head)) return 'MIT';
+  if (/\bBSD\b/.test(head) && /redistribution and use/i.test(head)) return 'BSD-3-Clause';
+  return null;
+}
+
+/** Read a checkout's LICENSE/LICENCE/COPYING file (any extension), or null if none. */
+function readLicenseFile(dir: string): string | null {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return null;
+  }
+  const match = entries.find((e) => /^(licen[sc]e|copying)(\..+)?$/i.test(e));
+  return match ? readTextIfPresent(join(dir, match)) : null;
+}
+
 /** What a single checkout yields: the L2 overlay (vetting) plus the discovery
  *  signals (solves/keywords) that make the package KNOWN and findable, not just
  *  vettable-by-name. `solves` is null when the manifest declares no usable
@@ -281,7 +313,10 @@ export function derivePackageFromCheckout(dir: string, opts: DeriveOptions): Der
   const npmId = packageIdentityFromManifest(pkgJson);
   if (npmId && pkgJson) {
     const declared = pkgJson.license;
-    const license = typeof declared === 'string' && declared.trim() ? declared : 'UNLICENSED';
+    const license =
+      (typeof declared === 'string' && declared.trim() ? declared : null) ??
+      detectLicenseFromText(readLicenseFile(dir)) ??
+      'UNLICENSED';
     return {
       overlay: buildDerivedL2({
         package: npmId.package,
@@ -304,7 +339,7 @@ export function derivePackageFromCheckout(dir: string, opts: DeriveOptions): Der
         overlay: buildDerivedL2({
           package: pyId.package,
           ecosystem: pyId.ecosystem,
-          license: licenseFromPyproject(pyproject) ?? 'UNLICENSED',
+          license: licenseFromPyproject(pyproject) ?? detectLicenseFromText(readLicenseFile(dir)) ?? 'UNLICENSED',
           maintenance: maintenance(),
           fetchedAt: opts.fetchedAt,
         }),
