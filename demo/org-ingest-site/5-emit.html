@@ -5,7 +5,7 @@
 <body>
 <header class="top">
   <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
-  <span class="asof">generated 2026-06-10 · real output from <code>src/engine/facts</code></span>
+  <span class="asof">generated 2026-06-14 · real output from <code>src/engine/facts</code></span>
 </header>
 <nav class="stepper"><a class="navlink" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" aria-current="page" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
 <main>
@@ -13,7 +13,7 @@
   
 <p class="lead"><span class="badge shipped">SHIPPED</span> Approved facts fan into the on-disk shapes the loaders already read — built with <code class="k">upsertL2Entry()</code> and <code class="k">upsertPolicy()</code>. Point <code class="k">STARLOG_PRIVATE_FACTS</code> / <code class="k">STARLOG_POLICY</code> at these (Phase 1, local) — or push L2+L3 to the hosted API for team sharing (Phase 2).</p>
 <div class="grid two">
-  <div><h2><code class="k">private-facts.json</code> <span style="color:var(--mut);font-weight:400">→ STARLOG_PRIVATE_FACTS</span></h2><pre class="json">{
+  <div><h2><code class="k">private-facts.json</code> <span style="color:var(--mut);font-weight:400">→ STARLOG_PRIVATE_FACTS (agent reads)</span></h2><pre class="json">{
   &quot;l1&quot;: [],
   &quot;l2&quot;: [
     {
@@ -27,7 +27,7 @@
       &quot;attestation&quot;: {
         &quot;source&quot;: &quot;analyzer&quot;,
         &quot;refs&quot;: [],
-        &quot;fetched_at&quot;: &quot;2026-06-10&quot;
+        &quot;fetched_at&quot;: &quot;2026-06-14&quot;
       }
     },
     {
@@ -41,7 +41,7 @@
       &quot;attestation&quot;: {
         &quot;source&quot;: &quot;analyzer&quot;,
         &quot;refs&quot;: [],
-        &quot;fetched_at&quot;: &quot;2026-06-10&quot;
+        &quot;fetched_at&quot;: &quot;2026-06-14&quot;
       }
     },
     {
@@ -55,7 +55,7 @@
       &quot;attestation&quot;: {
         &quot;source&quot;: &quot;analyzer&quot;,
         &quot;refs&quot;: [],
-        &quot;fetched_at&quot;: &quot;2026-06-10&quot;
+        &quot;fetched_at&quot;: &quot;2026-06-14&quot;
       }
     },
     {
@@ -69,12 +69,12 @@
       &quot;attestation&quot;: {
         &quot;source&quot;: &quot;analyzer&quot;,
         &quot;refs&quot;: [],
-        &quot;fetched_at&quot;: &quot;2026-06-10&quot;
+        &quot;fetched_at&quot;: &quot;2026-06-14&quot;
       }
     }
   ]
 }</pre></div>
-  <div><h2><code class="k">policy.json</code> <span style="color:var(--mut);font-weight:400">→ STARLOG_POLICY</span></h2><pre class="json">{
+  <div><h2><code class="k">policy.suggested.json</code> <span style="color:var(--mut);font-weight:400">→ proposals, agent does NOT read</span></h2><pre class="json">{
   &quot;org&quot;: &quot;local&quot;,
   &quot;rules&quot;: [
     {
@@ -96,12 +96,11 @@
   ]
 }</pre></div>
 </div>
-<div class="note"><b>L1 stays local.</b> The hosted API accepts L2 + L3 only — internal capability facts live in the local <code class="k">{l1,l2}</code> file until a signed-provenance path is built. That's why <code class="k">l1</code> is empty here.</div>
+<div class="note"><b>Propose, don't apply.</b> Facts go to the file the agent reads; suggested verdicts go to a <i>separate</i> proposal file that <code class="k">STARLOG_POLICY</code> does not load. They fire only once a human adopts them — regenerated fresh each sync, so a fixed package stops being flagged. <b>L1 stays local</b> too: the hosted API takes L2 + L3 only, so <code class="k">l1</code> is empty here.</div>
   <div class="pager"><a class="pg prev" href="4-suggest.html">← Suggest L3</a><a class="pg next" href="6-agent.html">Agent view →</a></div>
 </main>
 <footer class="foot">
-  <span class="badge shipped">SHIPPED</span> runs in the shipped code today ·
-  <span class="badge preview">PREVIEW</span> logic shown, not yet a CLI command ·
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today (incl. <code>starlog org sync</code>) ·
   <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
 </footer>
 </body></html>

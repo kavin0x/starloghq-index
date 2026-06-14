@@ -16,7 +16,7 @@
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { deriveL2FromCheckout, packageIdentityFromManifest } from '../src/engine/facts/ingest.js';
+import { deriveL2FromCheckout, packageIdentityFromManifest, suggestL3Rules, type SuggestedRule } from '../src/engine/facts/ingest.js';
 import { upsertL2Entry, buildL3Rule, upsertPolicy, today } from '../src/engine/facts/authoring.js';
 import { buildComposeDeps, resolveFactView } from '../src/engine/facts/service.js';
 import { formatFactView } from '../src/engine/facts/format.js';
@@ -69,26 +69,13 @@ function maintReason(r: RepoFixture, o: L2Overlay): string {
   return `last commit ${r.lastCommitDaysAgo}d ago → active`;
 }
 
-// ── PREVIEW L3 suggester (not yet in src/ — derived from REAL L2 signals) ──
-interface Suggestion { signal: string; rationale: string; }
-function suggestRules(o: L2Overlay): Suggestion[] {
-  const out: Suggestion[] = [];
-  if (o.maintenance === 'deprecated' || o.maintenance === 'abandoned')
-    out.push({ signal: `maintenance: ${o.maintenance}`, rationale: `Internal package is ${o.maintenance}; assign an owner or migrate off it.` });
-  if (o.license_risk === 'copyleft-strong')
-    out.push({ signal: 'license_risk: copyleft-strong', rationale: `${o.license} is strong copyleft; legal review before shipping in a proprietary product.` });
-  if (o.license_risk === 'unknown')
-    out.push({ signal: 'license_risk: unknown', rationale: 'No clear license; resolve licensing before depending on this internally.' });
-  if (o.known_vulns.length > 0)
-    out.push({ signal: 'has_known_vulns', rationale: 'Known incidents on file; review before use.' });
-  return out;
-}
+// L3 suggester is now SHIPPED code (src/engine/facts/ingest.ts) — call it directly.
 
 export interface Row {
   fix: RepoFixture;
   identity: { package: string; ecosystem: 'npm' } | null;
   overlay: L2Overlay | null;
-  suggestions: Suggestion[];
+  suggestions: SuggestedRule[];
   agentMarkdown: string;
   verdictFired: boolean;
 }
@@ -108,7 +95,7 @@ async function runPipeline(): Promise<{ rows: Row[]; privateFacts: { l1: unknown
     const identity = packageIdentityFromManifest(fix.pkg);
     const overlay = deriveL2FromCheckout(dir, { fetchedAt: FETCHED_AT, archived: fix.archived, lastCommitDaysAgo: fix.lastCommitDaysAgo });
 
-    const suggestions = overlay ? suggestRules(overlay) : [];
+    const suggestions = overlay ? suggestL3Rules(overlay) : [];
     if (overlay) {
       privateFacts = upsertL2Entry(privateFacts, overlay);
       if (suggestions.length > 0) {
@@ -194,8 +181,7 @@ function shell(page: Page, body: string): string {
   ${pager}
 </main>
 <footer class="foot">
-  <span class="badge shipped">SHIPPED</span> runs in the shipped code today ·
-  <span class="badge preview">PREVIEW</span> logic shown, not yet a CLI command ·
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today (incl. <code>starlog org sync</code>) ·
   <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
 </footer>
 </body></html>`;
@@ -293,7 +279,7 @@ const pageBy = (slug: string) => PAGES.find((p) => p.slug === slug)!;
 function renderIndex(rows: Row[]) {
   const flow = [
     ['1', 'Enumerate', 'planned'], ['2', 'Identify', 'shipped'], ['3', 'Derive L2', 'shipped'],
-    ['4', 'Suggest L3', 'preview'], ['5', 'Emit', 'shipped'], ['6', 'Agent sees', 'shipped'],
+    ['4', 'Suggest L3', 'shipped'], ['5', 'Emit', 'shipped'], ['6', 'Agent sees', 'shipped'],
   ].map((s, i, a) => `<div class="node"><div class="n">step ${s[0]}</div><div class="t">${s[1]}</div>${badge(s[2] as 'shipped')}</div>${i < a.length - 1 ? '<div class="arrow">→</div>' : ''}`).join('');
   const kept = rows.filter((r) => r.overlay).length;
   const skipped = rows.length - kept;
@@ -308,13 +294,13 @@ function renderIndex(rows: Row[]) {
       <tr><td>Resolved to a package</td><td class="mono">${kept}</td></tr>
       <tr><td>Skipped (no published identity)</td><td class="mono">${skipped}</td></tr>
       <tr><td>L2 overlays derived <span class="badge shipped">SHIPPED</span></td><td class="mono">${kept}</td></tr>
-      <tr><td>Policy verdicts that fired <span class="badge preview">PREVIEW</span></td><td class="mono">${flagged}</td></tr>
+      <tr><td>Policy verdicts that fired <span class="badge shipped">SHIPPED</span></td><td class="mono">${flagged}</td></tr>
     </table>
   </div>
   <div class="card"><h2 style="margin-top:0">What's real vs. planned</h2>
     <ul class="tight">
       <li>${badge('shipped')} identity, L2 derivation, emit, and the serve path are the <i>actual</i> functions in <code class="k">src/engine/facts</code>.</li>
-      <li>${badge('preview')} the L3 <i>suggester</i> logic is shown here, derived from real L2 signals — not yet a CLI command.</li>
+      <li>${badge('shipped')} the L3 <i>suggester</i> is real code (<code class="k">suggestL3Rules</code>), run by <code class="k">starlog org sync</code> over a directory of checkouts.</li>
       <li>${badge('planned')} GitHub enumeration and the L1 capability analyzer are the next phase; never faked into the emitted artifacts.</li>
     </ul>
     <div class="note">Full plan: <code class="k">.planning/org-ingest-analysis.md</code> — chosen architecture <b>hybrid-local-then-action</b>.</div>
@@ -379,7 +365,7 @@ function renderSuggest(rows: Row[]) {
     return `<tr><td class="mono">${esc(r.overlay!.package)}</td><td>${cell}</td></tr>`;
   }).join('');
   P(pageBy('4-suggest'), `
-<p class="lead">${badge('preview')} A suggester turns the <i>real</i> L2 signals into candidate <code class="k">L3</code> rules — conservative (always <code class="k">flag</code>, never auto-<code class="k">deny</code>). These are <b>proposals for human approval</b>, never auto-applied: the no-collapse invariant means policy is the org's call.</p>
+<p class="lead">${badge('shipped')} <code class="k">suggestL3Rules()</code> turns the <i>real</i> L2 signals into candidate <code class="k">L3</code> rules — conservative (always <code class="k">flag</code>, never auto-<code class="k">deny</code>). <code class="k">starlog org sync</code> writes these to <code class="k">policy.json</code> as <b>proposals for human approval</b>, never auto-applied: the no-collapse invariant means policy is the org's call.</p>
 <div class="card">
   <table><thead><tr><th>package</th><th>suggested policy</th></tr></thead><tbody>${tr}</tbody></table>
 </div>
@@ -392,10 +378,10 @@ function renderEmit(privateFacts: { l1: unknown[]; l2: L2Overlay[] }, policy: L3
   P(pageBy('5-emit'), `
 <p class="lead">${badge('shipped')} Approved facts fan into the on-disk shapes the loaders already read — built with <code class="k">upsertL2Entry()</code> and <code class="k">upsertPolicy()</code>. Point <code class="k">STARLOG_PRIVATE_FACTS</code> / <code class="k">STARLOG_POLICY</code> at these (Phase 1, local) — or push L2+L3 to the hosted API for team sharing (Phase 2).</p>
 <div class="grid two">
-  <div><h2><code class="k">private-facts.json</code> <span style="color:var(--mut);font-weight:400">→ STARLOG_PRIVATE_FACTS</span></h2><pre class="json">${facts}</pre></div>
-  <div><h2><code class="k">policy.json</code> <span style="color:var(--mut);font-weight:400">→ STARLOG_POLICY</span></h2><pre class="json">${pol}</pre></div>
+  <div><h2><code class="k">private-facts.json</code> <span style="color:var(--mut);font-weight:400">→ STARLOG_PRIVATE_FACTS (agent reads)</span></h2><pre class="json">${facts}</pre></div>
+  <div><h2><code class="k">policy.suggested.json</code> <span style="color:var(--mut);font-weight:400">→ proposals, agent does NOT read</span></h2><pre class="json">${pol}</pre></div>
 </div>
-<div class="note"><b>L1 stays local.</b> The hosted API accepts L2 + L3 only — internal capability facts live in the local <code class="k">{l1,l2}</code> file until a signed-provenance path is built. That's why <code class="k">l1</code> is empty here.</div>`);
+<div class="note"><b>Propose, don't apply.</b> Facts go to the file the agent reads; suggested verdicts go to a <i>separate</i> proposal file that <code class="k">STARLOG_POLICY</code> does not load. They fire only once a human adopts them — regenerated fresh each sync, so a fixed package stops being flagged. <b>L1 stays local</b> too: the hosted API takes L2 + L3 only, so <code class="k">l1</code> is empty here.</div>`);
 }
 
 function renderAgent(rows: Row[]) {
@@ -407,7 +393,7 @@ function renderAgent(rows: Row[]) {
   P(pageBy('6-agent'), `
 <p class="lead">${badge('shipped')} The payoff. Each block is the <i>exact</i> string <code class="k">resolveFactView()</code> + <code class="k">formatFactView()</code> return — the same serve path the <code class="k">starlog_facts</code> MCP tool and CLI use. The agent now sees license risk, maintenance, and the org's verdict on internal packages it has never been trained on.</p>
 ${cards}
-<div class="note"><b>End to end, for real:</b> these came from resolving the emitted <code class="k">private-facts.json</code> + <code class="k">policy.json</code> through <code class="k">buildComposeDeps()</code> with no API key — pure local offline path.</div>`);
+<div class="note"><b>End to end, for real:</b> these came from resolving the emitted <code class="k">private-facts.json</code> through <code class="k">buildComposeDeps()</code> with no API key — pure local offline path. The <span class="pill flag">flag</span> verdicts shown reflect the suggested policy <i>after a human adopts it</i> (<code class="k">STARLOG_POLICY</code>); without adoption the agent still sees the facts, just no verdict.</div>`);
 }
 
 async function main() {
