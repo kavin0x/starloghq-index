@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { L2OverlaySchema, L3RuleSchema } from '@starloghq/facts-schema';
 import { CapabilityManifestSchema } from '../../manifest/schema.js';
 import {
+  assembleL2,
   buildL2FromInput,
   parseVulnFlag,
   upsertL2Entry,
@@ -12,6 +13,28 @@ import {
   upsertPolicy,
   type AddL2Input,
 } from './authoring.js';
+
+describe('assembleL2 (shared L2 construction seam)', () => {
+  it('builds a schema-valid overlay, defaulting source=hand + today() + npm + [] + null', () => {
+    const o = assembleL2({ package: 'x', license: 'MIT', licenseRisk: 'none', maintenance: 'active' });
+    expect(L2OverlaySchema.safeParse(o).success).toBe(true);
+    expect(o.attestation.source).toBe('hand');
+    expect(o.ecosystem).toBe('npm');
+    expect(o.known_vulns).toEqual([]);
+    expect(o.transitive_risk).toBeNull();
+    expect(o.attestation.fetched_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('honors an analyzer source + injected fetched_at (the org-sync case)', () => {
+    const o = assembleL2({ package: 'x', license: 'MIT', licenseRisk: 'none', maintenance: 'active', source: 'analyzer', fetchedAt: '2026-06-10' });
+    expect(o.attestation.source).toBe('analyzer');
+    expect(o.attestation.fetched_at).toBe('2026-06-10');
+  });
+
+  it('surfaces the schema error (e.g. a bad fetched_at) rather than a generic failure', () => {
+    expect(() => assembleL2({ package: 'x', license: 'MIT', licenseRisk: 'none', maintenance: 'active', fetchedAt: 'nope' })).toThrow(/fetched_at/i);
+  });
+});
 
 /**
  * Unit tests for the PURE authoring layer (plan 11-01). These prove AUTH-02

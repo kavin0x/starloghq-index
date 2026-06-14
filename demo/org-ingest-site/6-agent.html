@@ -1,0 +1,57 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>What the agent sees · Starlog org-ingest</title>
+<link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
+  <span class="asof">generated 2026-06-14 · real output from <code>src/engine/facts</code></span>
+</header>
+<nav class="stepper"><a class="navlink" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" aria-current="page" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
+<main>
+  <h1><span class="hn">6</span>What the agent sees</h1>
+  
+<p class="lead"><span class="badge shipped">SHIPPED</span> The payoff. Each block is the <i>exact</i> string <code class="k">resolveFactView()</code> + <code class="k">formatFactView()</code> return — the same serve path the <code class="k">starlog_facts</code> MCP tool and CLI use. The agent now sees license risk, maintenance, and the org's verdict on internal packages it has never been trained on.</p>
+
+    <div class="agent" style="margin:16px 0">
+      <div class="bar"><span>$ starlog facts @acme/auth-tokens</span><span>no policy verdict</span></div>
+      <pre><span class="md-h">@acme/auth-tokens (npm)</span>
+<span class="md-k">Maintenance:</span> active
+<span class="md-k">License:</span> Apache-2.0 (risk: none)
+<span class="md-k">Known vulnerabilities / incidents:</span> No known vulnerabilities/incidents on file.
+<span class="md-k">Verified:</span> as of 2026-06-14</pre>
+    </div>
+    <div class="agent" style="margin:16px 0">
+      <div class="bar"><span>$ starlog facts @acme/billing-legacy</span><span>⚑ org policy fired</span></div>
+      <pre><span class="md-h">@acme/billing-legacy (npm)</span>
+<span class="md-k">Org policy:</span> FLAG — Internal package is deprecated; assign an owner or migrate off it. GPL-3.0-only is strong copyleft; legal review before shipping in a proprietary product. (rule pkg-@acme/billing-legacy)
+<span class="md-k">Maintenance:</span> deprecated
+<span class="md-k">License:</span> GPL-3.0-only (risk: copyleft-strong)
+<span class="md-k">Known vulnerabilities / incidents:</span> No known vulnerabilities/incidents on file.
+<span class="md-k">Verified:</span> as of 2026-06-14</pre>
+    </div>
+    <div class="agent" style="margin:16px 0">
+      <div class="bar"><span>$ starlog facts @acme/data-pipeline</span><span>⚑ org policy fired</span></div>
+      <pre><span class="md-h">@acme/data-pipeline (npm)</span>
+<span class="md-k">Org policy:</span> FLAG — Internal package is abandoned; assign an owner or migrate off it. No clear license; resolve licensing before depending on this internally. (rule pkg-@acme/data-pipeline)
+<span class="md-k">Maintenance:</span> abandoned
+<span class="md-k">License:</span> UNLICENSED (risk: unknown)
+<span class="md-k">Known vulnerabilities / incidents:</span> No known vulnerabilities/incidents on file.
+<span class="md-k">Verified:</span> as of 2026-06-14</pre>
+    </div>
+    <div class="agent" style="margin:16px 0">
+      <div class="bar"><span>$ starlog facts @acme/ui-kit</span><span>no policy verdict</span></div>
+      <pre><span class="md-h">@acme/ui-kit (npm)</span>
+<span class="md-k">Maintenance:</span> maintenance-only
+<span class="md-k">License:</span> MIT (risk: none)
+<span class="md-k">Known vulnerabilities / incidents:</span> No known vulnerabilities/incidents on file.
+<span class="md-k">Verified:</span> as of 2026-06-14</pre>
+    </div>
+<div class="note"><b>End to end, for real:</b> these came from resolving the emitted <code class="k">private-facts.json</code> through <code class="k">buildComposeDeps()</code> with no API key — pure local offline path. The <span class="pill flag">flag</span> verdicts shown reflect the suggested policy <i>after a human adopts it</i> (<code class="k">STARLOG_POLICY</code>); without adoption the agent still sees the facts, just no verdict.</div>
+  <div class="pager"><a class="pg prev" href="5-emit.html">← Emit</a><span></span></div>
+</main>
+<footer class="foot">
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today (incl. <code>starlog org sync</code>) ·
+  <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
+</footer>
+</body></html>

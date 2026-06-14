@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resolve package identity · Starlog org-ingest</title>
+<link rel="stylesheet" href="styles.css"></head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="logo">✦</span> Starlog <span class="sub">org-ingest</span></a>
+  <span class="asof">generated 2026-06-14 · real output from <code>src/engine/facts</code></span>
+</header>
+<nav class="stepper"><a class="navlink" href="index.html"><span class="step home">★</span>Overview</a><a class="navlink" href="1-enumerate.html"><span class="step">1</span>Enumerate</a><a class="navlink" aria-current="page" href="2-identify.html"><span class="step">2</span>Identify</a><a class="navlink" href="3-derive.html"><span class="step">3</span>Derive L2</a><a class="navlink" href="4-suggest.html"><span class="step">4</span>Suggest L3</a><a class="navlink" href="5-emit.html"><span class="step">5</span>Emit</a><a class="navlink" href="6-agent.html"><span class="step">6</span>Agent view</a></nav>
+<main>
+  <h1><span class="hn">2</span>Resolve package identity</h1>
+  
+<p class="lead"><span class="badge shipped">SHIPPED</span> <code class="k">packageIdentityFromManifest()</code> maps a repo's manifest to a <code class="k">(package, ecosystem)</code> key. Facts key on that pair, and the read path is exact-match-only — so a repo with no published name is <b>skipped</b> rather than written under a key the agent could never look up.</p>
+<div class="card">
+  <table><thead><tr><th>repo</th><th>identity</th><th>why</th></tr></thead><tbody><tr><td class="mono">acme/auth-tokens</td><td><span class="pill active">@acme/auth-tokens</span> <code class="k">npm</code></td><td style="color:var(--mut)">package.json has a name → keyed (name, npm)</td></tr><tr><td class="mono">acme/billing-legacy</td><td><span class="pill active">@acme/billing-legacy</span> <code class="k">npm</code></td><td style="color:var(--mut)">package.json has a name → keyed (name, npm)</td></tr><tr><td class="mono">acme/data-pipeline</td><td><span class="pill active">@acme/data-pipeline</span> <code class="k">npm</code></td><td style="color:var(--mut)">package.json has a name → keyed (name, npm)</td></tr><tr><td class="mono">acme/ui-kit</td><td><span class="pill active">@acme/ui-kit</span> <code class="k">npm</code></td><td style="color:var(--mut)">package.json has a name → keyed (name, npm)</td></tr><tr><td class="mono">acme/internal-scripts</td><td><span class="pill skip">null — skipped</span></td><td style="color:var(--mut)">no name (private) → deferred, never fabricated</td></tr></tbody></table>
+</div>
+<div class="note"><b>Deferred honestly:</b> monorepos (N manifests → N packages) and synthetic keys for unpublished/git-URL deps are a later phase. This slice resolves published npm names only.</div>
+  <div class="pager"><a class="pg prev" href="1-enumerate.html">← Enumerate</a><a class="pg next" href="3-derive.html">Derive L2 →</a></div>
+</main>
+<footer class="foot">
+  <span class="badge shipped">SHIPPED</span> runs in the shipped code today (incl. <code>starlog org sync</code>) ·
+  <span class="badge planned">PLANNED</span> next phase, not faked into artifacts
+</footer>
+</body></html>

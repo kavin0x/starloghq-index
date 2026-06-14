@@ -18,6 +18,8 @@ export * from '@starloghq/facts-schema';
 
 export * from './facts/l2-source.js';
 export * from './facts/authoring.js';
+export * from './facts/ingest.js';
+export * from './facts/org-sync.js';
 export * from './facts/compose.js';
 export * from './facts/api-client.js';
 export * from './facts/service.js';

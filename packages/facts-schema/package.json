@@ -1,6 +1,6 @@
 {
   "name": "@starloghq/facts-schema",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Canonical L1/L2/L3 facts contract for Starlog — zod schemas + policy semantics shared by the client and the API/worker. Zero deps except zod.",
   "license": "BUSL-1.1",
   "author": "Starlog",
