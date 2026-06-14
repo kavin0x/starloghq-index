@@ -72,6 +72,10 @@ describe('L2OverlaySchema', () => {
     }
   });
 
+  it("accepts 'analyzer' as an attestation source — clone-derived L2 (license/maintenance) needs an honest label, not 'hand'", () => {
+    expect(L2OverlaySchema.safeParse(l2({ attestation: { source: 'analyzer', refs: [], fetched_at: '2026-06-01' } })).success).toBe(true);
+  });
+
   it('VulnSchema enforces severity enum and required fields', () => {
     expect(VulnSchema.safeParse({ id: 'CVE-1', severity: 'critical', affected: '1.0', summary: 's' }).success).toBe(true);
     expect(VulnSchema.safeParse({ id: 'CVE-1', severity: 'apocalyptic', affected: '1.0', summary: 's' }).success).toBe(false);

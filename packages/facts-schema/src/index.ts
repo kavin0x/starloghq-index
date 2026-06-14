@@ -49,7 +49,7 @@ export const VulnSchema = z.object({
 export type Vuln = z.infer<typeof VulnSchema>;
 
 export const L2AttestationSchema = z.object({
-  source: z.enum(['hand', 'osv', 'deps.dev', 'scorecard']), // producers set this
+  source: z.enum(['hand', 'analyzer', 'osv', 'deps.dev', 'scorecard']), // producers set this ('analyzer' = clone-derived, mirrors L1 derived_by)
   refs: z.array(z.string()).default([]), // advisory ids / hash-pinned overlay digests
   fetched_at: z.iso.date({ error: 'fetched_at must be a valid ISO date (YYYY-MM-DD)' }), // the freshness gate
 });
