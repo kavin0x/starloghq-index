@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { L2OverlaySchema, type Ecosystem, type L2Overlay, type Vuln } from '@starloghq/facts-schema';
+import type { Ecosystem, L2Overlay, Vuln } from '@starloghq/facts-schema';
+import { assembleL2 } from './authoring.js';
 
 /**
  * INGEST primitives — the first slice of org-ingest (see .planning/org-ingest-analysis.md):
@@ -83,29 +84,27 @@ export interface DerivedL2Input {
 }
 
 /**
- * Construct a schema-valid L2 overlay DIRECTLY against L2OverlaySchema with the honest
- * attestation.source 'analyzer' — the analyzer twin of buildL2FromInput (which is locked
- * to source 'hand'). license_risk is derived from the license when not given. Throws a
- * clear, actionable Error (surfacing the schema's own message, e.g. for a bad fetched_at)
- * rather than emitting an unparseable fact.
+ * Construct a schema-valid L2 overlay with the honest attestation.source 'analyzer'
+ * — the analyzer twin of buildL2FromInput (which is locked to source 'hand'). Both
+ * route through the shared assembleL2 seam; license_risk is derived from the license
+ * when not given. Throws a clear, actionable Error (surfacing the schema's own
+ * message, e.g. for a bad fetched_at) rather than emitting an unparseable fact.
  */
 export function buildDerivedL2(input: DerivedL2Input): L2Overlay {
-  const candidate = {
+  // The analyzer twin of buildL2FromInput: derive license_risk from the license
+  // when not given, stamp source='analyzer', then construct + validate through the
+  // shared assembleL2 seam (single source of truth for L2 shape + validation).
+  return assembleL2({
     package: input.package,
-    ecosystem: input.ecosystem ?? 'npm',
-    known_vulns: input.knownVulns ?? [],
+    ecosystem: input.ecosystem,
     license: input.license,
-    license_risk: input.licenseRisk ?? spdxToLicenseRisk(input.license),
+    licenseRisk: input.licenseRisk ?? spdxToLicenseRisk(input.license),
     maintenance: input.maintenance,
-    transitive_risk: input.transitiveRisk ?? null,
-    attestation: { source: 'analyzer', refs: [], fetched_at: input.fetchedAt },
-  };
-  const r = L2OverlaySchema.safeParse(candidate);
-  if (!r.success) {
-    const why = r.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
-    throw new Error('Could not construct a valid L2 overlay: ' + why);
-  }
-  return r.data;
+    knownVulns: input.knownVulns,
+    transitiveRisk: input.transitiveRisk,
+    source: 'analyzer',
+    fetchedAt: input.fetchedAt,
+  });
 }
 
 /**

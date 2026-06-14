@@ -1,4 +1,5 @@
 import {
+  L2OverlaySchema,
   L3RuleSchema,
   L3PolicySchema,
   type L2Overlay,
@@ -6,7 +7,6 @@ import {
   type L3Policy,
   type Vuln,
 } from '@starloghq/facts-schema';
-import { parseOverlay } from './l2-source.js';
 import { CapabilityManifestSchema, type CapabilityManifest } from '../../manifest/schema.js';
 
 /**
@@ -40,6 +40,47 @@ export interface AddL2Input {
   licenseRisk?: string;
   transitiveRisk?: string;
   vulns?: string[];
+}
+
+/**
+ * The single L2 construction seam — assemble an overlay from already-RESOLVED
+ * fields and validate it against L2OverlaySchema. Both the hand path
+ * (buildL2FromInput, source='hand') and the analyzer path (ingest.buildDerivedL2,
+ * source='analyzer') route through here so the shape + validation live in ONE
+ * place. Defaults: source 'hand', fetched_at today(), ecosystem 'npm'. Throws a
+ * clear, actionable Error surfacing the schema's own message (e.g. a bad
+ * fetched_at) rather than a generic failure.
+ */
+export interface AssembleL2Fields {
+  package: string;
+  license: string;
+  licenseRisk: string;
+  maintenance: string;
+  ecosystem?: string;
+  knownVulns?: Vuln[];
+  transitiveRisk?: string | null;
+  source?: 'hand' | 'analyzer' | 'osv' | 'deps.dev' | 'scorecard';
+  fetchedAt?: string;
+  refs?: string[];
+}
+
+export function assembleL2(f: AssembleL2Fields): L2Overlay {
+  const candidate = {
+    package: f.package,
+    ecosystem: f.ecosystem ?? 'npm',
+    known_vulns: f.knownVulns ?? [],
+    license: f.license,
+    license_risk: f.licenseRisk,
+    maintenance: f.maintenance,
+    transitive_risk: f.transitiveRisk ?? null,
+    attestation: { source: f.source ?? 'hand', refs: f.refs ?? [], fetched_at: f.fetchedAt ?? today() },
+  };
+  const r = L2OverlaySchema.safeParse(candidate);
+  if (!r.success) {
+    const why = r.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+    throw new Error('Could not construct a valid L2 overlay: ' + why);
+  }
+  return r.data;
 }
 
 /**
@@ -92,21 +133,16 @@ export function buildL2FromInput(input: AddL2Input): L2Overlay {
 
   const known_vulns = (input.vulns ?? []).map(parseVulnFlag);
 
-  const candidate = {
+  // Construction + validation go through the shared seam (source defaults to 'hand').
+  return assembleL2({
     package: input.package,
     ecosystem,
-    known_vulns,
     license,
-    license_risk: licenseRisk,
+    licenseRisk,
     maintenance: status,
-    transitive_risk: input.transitiveRisk ?? null,
-    attestation: { source: 'hand', refs: [], fetched_at: today() },
-  };
-
-  // Proves AUTH-02 at the function layer: minimal input must validate.
-  const overlay = parseOverlay(candidate);
-  if (!overlay) throw new Error('Internal: constructed L2 overlay failed schema validation.');
-  return overlay;
+    knownVulns: known_vulns,
+    transitiveRisk: input.transitiveRisk ?? null,
+  });
 }
 
 export interface PrivateFactsFile {
