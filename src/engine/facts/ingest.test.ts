@@ -12,6 +12,11 @@ import {
   suggestL3Rules,
   packageIdentityFromPyproject,
   licenseFromPyproject,
+  descriptionFromManifest,
+  descriptionFromPyproject,
+  keywordsFromManifest,
+  keywordsFromPyproject,
+  derivePackageFromCheckout,
 } from './ingest.js';
 import { upsertL2Entry } from './authoring.js';
 import { parseOverlay } from './l2-source.js';
@@ -140,6 +145,63 @@ describe('licenseFromPyproject', () => {
 
   it('does not read a license from outside the [project] table', () => {
     expect(licenseFromPyproject('[project]\nname = "a"\n[tool.x]\nlicense = "GPL-3.0"\n')).toBeNull();
+  });
+});
+
+describe('description / keywords extraction (the "what it does" the agent needs)', () => {
+  it('reads a npm description, rejecting empty and the cookiecutter placeholder', () => {
+    expect(descriptionFromManifest({ description: 'Headless Burp Suite scanner' })).toBe('Headless Burp Suite scanner');
+    expect(descriptionFromManifest({ description: '   ' })).toBeNull();
+    expect(descriptionFromManifest({ description: 'Add your description here' })).toBeNull();
+    expect(descriptionFromManifest({})).toBeNull();
+  });
+
+  it('reads a pyproject [project].description, rejecting the placeholder', () => {
+    expect(descriptionFromPyproject('[project]\nname="a"\ndescription = "Autonomous pentest agent on Hermes Agent"\n')).toBe('Autonomous pentest agent on Hermes Agent');
+    expect(descriptionFromPyproject('[project]\ndescription = "Add your description here"\n')).toBeNull();
+    expect(descriptionFromPyproject('[project]\nname="a"\n')).toBeNull();
+  });
+
+  it('reads keywords from both ecosystems (inline or multiline arrays)', () => {
+    expect(keywordsFromManifest({ keywords: ['security', 'ai'] })).toEqual(['security', 'ai']);
+    expect(keywordsFromManifest({})).toEqual([]);
+    expect(keywordsFromPyproject('[project]\nkeywords = ["security", "vulnerability", "ai"]\n')).toEqual(['security', 'vulnerability', 'ai']);
+    expect(keywordsFromPyproject('[project]\nkeywords = [\n  "a",\n  "b",\n]\n')).toEqual(['a', 'b']);
+    expect(keywordsFromPyproject('[project]\nname="a"\n')).toEqual([]);
+  });
+});
+
+describe('derivePackageFromCheckout (facts + discovery in one pass)', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'starlog-derive-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('returns the overlay plus solves+keywords for an npm package', () => {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/scan', license: 'MIT', description: 'scans things', keywords: ['scan'] }));
+    const r = derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(r.overlay.package).toBe('@acme/scan');
+    expect(r.solves).toBe('scans things');
+    expect(r.keywords).toEqual(['scan']);
+  });
+
+  it('returns the overlay plus solves+keywords for a python package', () => {
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "cybereval"\ndescription = "Evaluation framework for cybersecurity testing agents"\nkeywords = ["cybersecurity", "evaluation"]\n');
+    const r = derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(r.overlay.ecosystem).toBe('pypi');
+    expect(r.solves).toBe('Evaluation framework for cybersecurity testing agents');
+    expect(r.keywords).toEqual(['cybersecurity', 'evaluation']);
+  });
+
+  it('solves is null when no usable description (→ not discoverable, flagged upstream)', () => {
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "vuln-confidence"\n');
+    const r = derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(r.overlay.package).toBe('vuln-confidence');
+    expect(r.solves).toBeNull();
+  });
+
+  it('returns null when there is no published identity', () => {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ private: true }));
+    expect(derivePackageFromCheckout(dir, { fetchedAt: '2026-06-10' })).toBeNull();
   });
 });
 

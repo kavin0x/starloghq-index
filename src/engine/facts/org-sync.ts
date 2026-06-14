@@ -2,8 +2,9 @@ import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { L2Overlay, L3Policy } from '@starloghq/facts-schema';
-import { deriveL2FromCheckout, suggestL3Rules } from './ingest.js';
-import { upsertL2Entry, upsertPolicy, buildL3Rule } from './authoring.js';
+import type { CapabilityManifest } from '../../manifest/schema.js';
+import { derivePackageFromCheckout, suggestL3Rules } from './ingest.js';
+import { upsertL2Entry, upsertPolicy, buildL3Rule, buildManifestFromInput, upsertManifestEntry } from './authoring.js';
 
 /**
  * Phase-1 LOCAL org sync — the runnable spine. Walk a directory of checkouts,
@@ -22,7 +23,11 @@ export interface Checkout {
 export interface SyncResult {
   privateFacts: { l1: unknown[]; l2: L2Overlay[] };
   policy: L3Policy | null;
+  /** Discovery corpus — makes packages findable by `search`, not just vettable by name. */
+  corpus: { manifests: CapabilityManifest[] };
   derived: { package: string; flagged: boolean }[];
+  /** Packages derived as facts but NOT made discoverable (no usable description). */
+  noDescription: string[];
   skipped: string[];
 }
 
@@ -31,6 +36,12 @@ export interface SyncOptions {
   /** Existing on-disk artifacts to merge over (re-derived facts win; others preserved). */
   seedFacts?: { l1?: unknown[]; l2?: unknown[] } | null;
   seedPolicy?: { org?: string; rules?: unknown[] } | null;
+  seedCorpus?: { manifests?: unknown[] } | null;
+}
+
+/** Manifest ecosystem is npm|pypi|both; map the package's ecosystem (never 'system' for a derived pkg). */
+function manifestEcosystem(eco: string): string {
+  return eco === 'pypi' ? 'pypi' : 'npm';
 }
 
 /** A directory is a checkout if it has a manifest we can derive from (npm or python). */
@@ -71,19 +82,27 @@ export function syncCheckouts(checkouts: Checkout[], opts: SyncOptions): SyncRes
   // Start from the seed policy (if any) and upsert suggested rules into it.
   let policyShape: { org?: string; rules?: unknown[] } | null = opts.seedPolicy ?? null;
 
+  // Discovery corpus, seeded from any existing file (re-derived entries replace by id).
+  let corpus: { manifests: CapabilityManifest[] } = { manifests: [] };
+  for (const seed of Array.isArray(opts.seedCorpus?.manifests) ? (opts.seedCorpus!.manifests as CapabilityManifest[]) : []) {
+    corpus = upsertManifestEntry(corpus, seed);
+  }
+
   const derived: { package: string; flagged: boolean }[] = [];
+  const noDescription: string[] = [];
   const skipped: string[] = [];
 
   for (const co of checkouts) {
-    const overlay = deriveL2FromCheckout(co.dir, {
+    const pkg = derivePackageFromCheckout(co.dir, {
       fetchedAt: opts.fetchedAt,
       archived: co.archived,
       lastCommitDaysAgo: co.lastCommitDaysAgo,
     });
-    if (!overlay) {
+    if (!pkg) {
       skipped.push(co.dir);
       continue;
     }
+    const { overlay, solves, keywords } = pkg;
     privateFacts = upsertL2Entry(privateFacts, overlay);
 
     const suggestions = suggestL3Rules(overlay);
@@ -91,12 +110,29 @@ export function syncCheckouts(checkouts: Checkout[], opts: SyncOptions): SyncRes
       const rationale = suggestions.map((s) => s.rationale).join(' ');
       policyShape = upsertPolicy(policyShape, buildL3Rule(overlay.package, 'flag', rationale));
     }
+
+    // Discovery: a usable description makes the package findable by `search`.
+    if (solves) {
+      corpus = upsertManifestEntry(
+        corpus,
+        buildManifestFromInput({
+          package: overlay.package,
+          solves,
+          ecosystem: manifestEcosystem(overlay.ecosystem),
+          stack: keywords,
+          license: overlay.license,
+        }),
+      );
+    } else {
+      noDescription.push(overlay.package);
+    }
+
     derived.push({ package: overlay.package, flagged: suggestions.length > 0 });
   }
 
   const policy: L3Policy | null =
     policyShape && Array.isArray(policyShape.rules) && policyShape.rules.length > 0 ? (policyShape as L3Policy) : null;
-  return { privateFacts, policy, derived, skipped };
+  return { privateFacts, policy, corpus, derived, noDescription, skipped };
 }
 
 /**

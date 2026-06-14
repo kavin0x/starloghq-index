@@ -277,6 +277,9 @@ const DEFAULT_POLICY = '.starlog/policy.json';
 // agent does not read this file, so derived flags are proposals (review-then-
 // apply), never auto-applied to the live policy. Regenerated fresh each sync.
 const DEFAULT_SUGGESTED_POLICY = '.starlog/policy.suggested.json';
+// The DISCOVERY corpus (STARLOG_PRIVATE_CORPUS) — what `search` reads to surface
+// internal packages by capability. `org sync` and `corpus add` both write it.
+const DEFAULT_PRIVATE_CORPUS = '.starlog/private-corpus.json';
 
 /** ENOENT-tolerant JSON read: missing file → null; malformed JSON → throws
  *  (SyntaxError → fail() prints the "invalid JSON — fix or remove" message,
@@ -462,11 +465,12 @@ const org = program
 org
   .command('sync <dir>')
   .description('Scan a directory of checked-out repos and derive/refresh their private facts (+ suggested policy)')
-  .option('--facts-out <path>', 'Where to write the private L2 facts', DEFAULT_PRIVATE_FACTS)
+  .option('--facts-out <path>', 'Where to write the private L2 facts (agent vets these by name)', DEFAULT_PRIVATE_FACTS)
+  .option('--corpus-out <path>', 'Where to write the discovery corpus (search surfaces these by capability)', DEFAULT_PRIVATE_CORPUS)
   .option('--policy-out <path>', 'Where to write SUGGESTED L3 rules (a proposal file the agent does not read)', DEFAULT_SUGGESTED_POLICY)
   .option('--no-git', 'Skip git last-commit detection (maintenance falls back to active)')
   .action(
-    action('org sync failed', async (dir: string, opts: { factsOut: string; policyOut: string; git: boolean }) => {
+    action('org sync failed', async (dir: string, opts: { factsOut: string; corpusOut: string; policyOut: string; git: boolean }) => {
       const dirs = discoverCheckouts(dir);
       if (dirs.length === 0) {
         console.error(`org sync: no checkouts found under ${dir} (looked for immediate subdirectories containing a package.json).`);
@@ -484,10 +488,12 @@ org
       // seed) so a fixed package stops being flagged, and they go to a SEPARATE file
       // the agent does not read — proposals, not auto-applied.
       const seedFacts = readJsonIfPresent(opts.factsOut) as { l1?: unknown[]; l2?: unknown[] } | null;
+      const seedCorpus = readJsonIfPresent(opts.corpusOut) as { manifests?: unknown[] } | null;
 
-      const res = syncCheckouts(checkouts, { fetchedAt: today(), seedFacts });
+      const res = syncCheckouts(checkouts, { fetchedAt: today(), seedFacts, seedCorpus });
 
       await atomicWrite(opts.factsOut, JSON.stringify(res.privateFacts, null, 2) + '\n');
+      await atomicWrite(opts.corpusOut, JSON.stringify(res.corpus, null, 2) + '\n');
       // Always (re)write the suggestion file so stale flags are dropped on re-sync.
       const suggested = res.policy ?? { org: 'local', rules: [] };
       await atomicWrite(opts.policyOut, JSON.stringify(suggested, null, 2) + '\n');
@@ -495,12 +501,16 @@ org
       const flagged = res.derived.filter((d) => d.flagged).length;
       await track(
         'cli_org_sync',
-        { scanned: dirs.length, derived: res.derived.length, skipped: res.skipped.length, flagged },
+        { scanned: dirs.length, derived: res.derived.length, skipped: res.skipped.length, flagged, discoverable: res.corpus.manifests.length },
         { noTelemetry: noTelemetry() },
       );
 
       console.log(`Scanned ${dirs.length} checkout(s): derived ${res.derived.length} package fact(s), skipped ${res.skipped.length} (no published name).`);
-      console.log(`Wrote ${res.privateFacts.l2.length} L2 overlay(s) to ${opts.factsOut} — your agent reads these after \`starlog init\`.`);
+      console.log(`Wrote ${res.privateFacts.l2.length} L2 overlay(s) to ${opts.factsOut} — your agent vets these by name after \`starlog init\`.`);
+      console.log(`Made ${res.corpus.manifests.length} package(s) DISCOVERABLE → ${opts.corpusOut} — \`search\` surfaces these by capability.`);
+      if (res.noDescription.length > 0) {
+        console.log(`  ${res.noDescription.length} package(s) have no description, so they are vettable but NOT discoverable: ${res.noDescription.join(', ')}. Add a description/[project].description to fix.`);
+      }
       if (flagged > 0) {
         console.log(`Suggested ${flagged} policy flag(s) → ${opts.policyOut} (PROPOSALS — the agent does NOT read this file). Review it, then apply the ones you trust with \`starlog facts policy <pkg> flag\`.`);
       } else {
@@ -513,7 +523,6 @@ org
 // Mirror of `facts add` for the OTHER private overlay: `facts add` makes an
 // internal package vettable (STARLOG_PRIVATE_FACTS); `corpus add` makes it
 // DISCOVERABLE (STARLOG_PRIVATE_CORPUS) so `search` surfaces it private-first.
-const DEFAULT_PRIVATE_CORPUS = '.starlog/private-corpus.json';
 
 /** commander value parser: "a, b ,c" → ['a','b','c'] (repeatable-free comma list). */
 function commaList(v: string): string[] {

@@ -41,8 +41,8 @@ function makeOrg(): string {
     mkdirSync(d, { recursive: true });
     writeFileSync(join(d, 'package.json'), JSON.stringify(pkg));
   };
-  repo('clean', { name: '@acme/clean', license: 'MIT' });
-  repo('legacy', { name: '@acme/legacy', license: 'GPL-3.0-only' });
+  repo('clean', { name: '@acme/clean', license: 'MIT', description: 'rotates short-lived database credentials', keywords: ['secrets', 'database'] });
+  repo('legacy', { name: '@acme/legacy', license: 'GPL-3.0-only' }); // no description
   repo('scripts', { private: true }); // no name → skipped
   return root;
 }
@@ -63,6 +63,29 @@ describe('starlog org sync (e2e)', () => {
 
       const policy = JSON.parse(readFileSync(policyOut, 'utf8'));
       expect(policy.rules.map((rl: { match: { package: string } }) => rl.match.package)).toEqual(['@acme/legacy']);
+    } finally {
+      rmSync(orgDir, { recursive: true, force: true });
+    }
+  });
+
+  it('makes a described package DISCOVERABLE — `search` surfaces it by capability', () => {
+    const orgDir = makeOrg();
+    const factsOut = join(orgDir, 'out-facts.json');
+    const corpusOut = join(orgDir, 'out-corpus.json');
+    const policyOut = join(orgDir, 'out-suggested.json');
+    try {
+      const sync = run(['org', 'sync', orgDir, '--facts-out', factsOut, '--corpus-out', corpusOut, '--policy-out', policyOut, '--no-git']);
+      expect(sync.status).toBe(0);
+      expect(sync.stdout).toMatch(/Made 1 package\(s\) DISCOVERABLE/);
+      expect(sync.stdout).toMatch(/not discoverable: @acme\/legacy/i); // no description
+
+      const corpus = JSON.parse(readFileSync(corpusOut, 'utf8'));
+      expect(corpus.manifests.map((m: { id: string }) => m.id)).toEqual(['@acme/clean']);
+
+      // The agent can now find it by capability, without knowing its name.
+      const search = run(['search', 'rotate database credentials'], { STARLOG_PRIVATE_CORPUS: corpusOut });
+      expect(search.status).toBe(0);
+      expect(search.stdout).toMatch(/@acme\/clean/);
     } finally {
       rmSync(orgDir, { recursive: true, force: true });
     }

@@ -125,9 +125,44 @@ function pyprojectSection(text: string): string {
   return body.join('\n');
 }
 
+/** Common cookiecutter/placeholder descriptions that carry no real meaning. */
+function isPlaceholderDescription(s: string): boolean {
+  return /^add your description here\.?$/i.test(s.trim());
+}
+
+/** A usable one-line "what it does" from package.json, or null (empty/placeholder/missing). */
+export function descriptionFromManifest(pkgJson: unknown): string | null {
+  if (!pkgJson || typeof pkgJson !== 'object') return null;
+  const d = (pkgJson as { description?: unknown }).description;
+  if (typeof d !== 'string' || !d.trim() || isPlaceholderDescription(d)) return null;
+  return d.trim();
+}
+
+/** keywords[] from package.json (strings only), or []. */
+export function keywordsFromManifest(pkgJson: unknown): string[] {
+  if (!pkgJson || typeof pkgJson !== 'object') return [];
+  const k = (pkgJson as { keywords?: unknown }).keywords;
+  return Array.isArray(k) ? k.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
+}
+
 export function packageIdentityFromPyproject(text: string): { package: string; ecosystem: 'pypi' } | null {
   const m = /^\s*name\s*=\s*"([^"]+)"/m.exec(pyprojectSection(text));
   return m && m[1].trim() ? { package: m[1], ecosystem: 'pypi' } : null;
+}
+
+/** A usable [project].description from pyproject.toml, or null. */
+export function descriptionFromPyproject(text: string): string | null {
+  const m = /^\s*description\s*=\s*"([^"]*)"/m.exec(pyprojectSection(text));
+  if (!m || !m[1].trim() || isPlaceholderDescription(m[1])) return null;
+  return m[1].trim();
+}
+
+/** keywords[] from a pyproject [project].keywords array (inline or multiline), or []. */
+export function keywordsFromPyproject(text: string): string[] {
+  const section = pyprojectSection(text);
+  const arr = /^\s*keywords\s*=\s*\[([\s\S]*?)\]/m.exec(section);
+  if (!arr) return [];
+  return [...arr[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
 /** Map an OSI "License :: OSI Approved :: <X>" classifier string to an SPDX id. */
@@ -220,14 +255,24 @@ function readTextIfPresent(path: string): string | null {
   }
 }
 
+/** What a single checkout yields: the L2 overlay (vetting) plus the discovery
+ *  signals (solves/keywords) that make the package KNOWN and findable, not just
+ *  vettable-by-name. `solves` is null when the manifest declares no usable
+ *  description — the caller treats that as "not discoverable, prompt for one". */
+export interface DerivedPackage {
+  overlay: L2Overlay;
+  solves: string | null;
+  keywords: string[];
+}
+
 /**
- * Derive an L2 overlay from a local checkout directory. Tries npm (package.json)
- * first, then pypi (pyproject.toml) — npm wins when both are present. Returns null
- * when the checkout has no published identity, so we never emit a fact under a key
- * the exact-match read path can't resolve. A missing/unrecognized license falls back
- * to 'UNLICENSED' → license_risk 'unknown' (never a false 'none').
+ * Derive everything we can from a local checkout in ONE pass. Tries npm
+ * (package.json) first, then pypi (pyproject.toml) — npm wins when both are
+ * present. Returns null when there is no published identity (never emit under a
+ * key the exact-match read path can't resolve). A missing/unrecognized license
+ * falls back to 'UNLICENSED' → license_risk 'unknown' (never a false 'none').
  */
-export function deriveL2FromCheckout(dir: string, opts: DeriveOptions): L2Overlay | null {
+export function derivePackageFromCheckout(dir: string, opts: DeriveOptions): DerivedPackage | null {
   const maintenance = (extra?: { deprecated?: boolean }) =>
     maintenanceFromActivity({ ...extra, archived: opts.archived, lastCommitDaysAgo: opts.lastCommitDaysAgo });
 
@@ -237,13 +282,17 @@ export function deriveL2FromCheckout(dir: string, opts: DeriveOptions): L2Overla
   if (npmId && pkgJson) {
     const declared = pkgJson.license;
     const license = typeof declared === 'string' && declared.trim() ? declared : 'UNLICENSED';
-    return buildDerivedL2({
-      package: npmId.package,
-      ecosystem: npmId.ecosystem,
-      license,
-      maintenance: maintenance({ deprecated: Boolean(pkgJson.deprecated) }),
-      fetchedAt: opts.fetchedAt,
-    });
+    return {
+      overlay: buildDerivedL2({
+        package: npmId.package,
+        ecosystem: npmId.ecosystem,
+        license,
+        maintenance: maintenance({ deprecated: Boolean(pkgJson.deprecated) }),
+        fetchedAt: opts.fetchedAt,
+      }),
+      solves: descriptionFromManifest(pkgJson),
+      keywords: keywordsFromManifest(pkgJson),
+    };
   }
 
   // pypi (PEP 621 pyproject.toml)
@@ -251,15 +300,24 @@ export function deriveL2FromCheckout(dir: string, opts: DeriveOptions): L2Overla
   if (pyproject) {
     const pyId = packageIdentityFromPyproject(pyproject);
     if (pyId) {
-      return buildDerivedL2({
-        package: pyId.package,
-        ecosystem: pyId.ecosystem,
-        license: licenseFromPyproject(pyproject) ?? 'UNLICENSED',
-        maintenance: maintenance(),
-        fetchedAt: opts.fetchedAt,
-      });
+      return {
+        overlay: buildDerivedL2({
+          package: pyId.package,
+          ecosystem: pyId.ecosystem,
+          license: licenseFromPyproject(pyproject) ?? 'UNLICENSED',
+          maintenance: maintenance(),
+          fetchedAt: opts.fetchedAt,
+        }),
+        solves: descriptionFromPyproject(pyproject),
+        keywords: keywordsFromPyproject(pyproject),
+      };
     }
   }
 
   return null;
+}
+
+/** Back-compat / facts-only convenience: just the L2 overlay from a checkout. */
+export function deriveL2FromCheckout(dir: string, opts: DeriveOptions): L2Overlay | null {
+  return derivePackageFromCheckout(dir, opts)?.overlay ?? null;
 }

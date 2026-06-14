@@ -61,6 +61,22 @@ describe('syncCheckouts', () => {
     expect(res.policy?.rules[0].decision).toBe('flag');
   });
 
+  it('builds a discovery corpus from descriptions and lists packages that have none', () => {
+    const described = repo(root, 'described', { name: '@acme/scan', license: 'MIT', description: 'scans repos for secrets', keywords: ['security'] });
+    const bare = repo(root, 'bare', { name: '@acme/bare', license: 'MIT' }); // no description
+
+    const res = syncCheckouts(
+      [{ dir: described, lastCommitDaysAgo: 5 }, { dir: bare, lastCommitDaysAgo: 5 }],
+      { fetchedAt: '2026-06-10' },
+    );
+
+    expect(res.corpus.manifests.map((m) => m.id)).toEqual(['@acme/scan']);
+    const m = res.corpus.manifests[0];
+    expect(m.solves).toBe('scans repos for secrets');
+    expect(m.stack_affinity).toEqual(['security']);
+    expect(res.noDescription).toEqual(['@acme/bare']); // derived as a fact, but not discoverable
+  });
+
   it('emits a null policy when nothing is flagged', () => {
     const clean = repo(root, 'clean', { name: '@acme/clean', license: 'MIT' });
     const res = syncCheckouts([{ dir: clean, lastCommitDaysAgo: 1 }], { fetchedAt: '2026-06-10' });
