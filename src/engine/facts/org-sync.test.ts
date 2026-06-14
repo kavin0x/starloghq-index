@@ -17,16 +17,18 @@ describe('discoverCheckouts', () => {
   beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'orgsync-disc-')); });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-  it('returns immediate subdirs that contain a package.json, sorted', () => {
+  it('returns immediate subdirs with a package.json OR pyproject.toml, sorted', () => {
     repo(root, 'b-pkg', { name: 'b' });
     repo(root, 'a-pkg', { name: 'a' });
-    mkdirSync(join(root, 'not-a-pkg'), { recursive: true }); // no package.json
+    mkdirSync(join(root, 'c-py'), { recursive: true });
+    writeFileSync(join(root, 'c-py', 'pyproject.toml'), '[project]\nname = "c"\n'); // python repo
+    mkdirSync(join(root, 'not-a-pkg'), { recursive: true }); // neither manifest
     const found = discoverCheckouts(root);
-    expect(found.map((d) => d.replace(root + '/', ''))).toEqual(['a-pkg', 'b-pkg']);
+    expect(found.map((d) => d.replace(root + '/', ''))).toEqual(['a-pkg', 'b-pkg', 'c-py']);
   });
 
-  it('treats the root itself as a single checkout when it has a package.json', () => {
-    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'solo' }));
+  it('treats the root itself as a single checkout when it has a manifest (npm or python)', () => {
+    writeFileSync(join(root, 'pyproject.toml'), '[project]\nname = "solo"\n');
     expect(discoverCheckouts(root)).toEqual([root]);
   });
 });

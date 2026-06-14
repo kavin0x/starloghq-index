@@ -108,6 +108,66 @@ export function buildDerivedL2(input: DerivedL2Input): L2Overlay {
   return r.data;
 }
 
+/**
+ * The `[project]` table body of a pyproject.toml (PEP 621) — from the `[project]`
+ * header up to the next table header. name/license/classifiers live here, before
+ * any `[project.*]` subtable, so this is enough to read them without a full TOML
+ * parser (zero new deps). Returns '' when there is no `[project]` table.
+ */
+function pyprojectSection(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => /^\s*\[project\]\s*$/.test(l));
+  if (start === -1) return '';
+  const body: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^\s*\[/.test(lines[i])) break; // next table (incl. [project.*]) ends the main body
+    body.push(lines[i]);
+  }
+  return body.join('\n');
+}
+
+export function packageIdentityFromPyproject(text: string): { package: string; ecosystem: 'pypi' } | null {
+  const m = /^\s*name\s*=\s*"([^"]+)"/m.exec(pyprojectSection(text));
+  return m && m[1].trim() ? { package: m[1], ecosystem: 'pypi' } : null;
+}
+
+/** Map an OSI "License :: OSI Approved :: <X>" classifier string to an SPDX id. */
+function classifierToSpdx(c: string): string | null {
+  if (/\bMIT\b/.test(c)) return 'MIT';
+  if (/Apache/i.test(c)) return 'Apache-2.0';
+  if (/\bISC\b/.test(c)) return 'ISC';
+  if (/\bBSD\b/.test(c)) return 'BSD-3-Clause';
+  if (/Affero|AGPL/i.test(c)) return 'AGPL-3.0';
+  if (/Lesser|LGPL/i.test(c)) return 'LGPL-3.0';
+  if (/General Public|GPL/i.test(c)) return 'GPL-3.0';
+  if (/Mozilla|MPL/i.test(c)) return 'MPL-2.0';
+  return null;
+}
+
+/**
+ * Read the declared license from a pyproject.toml [project] table: the SPDX string
+ * form (`license = "MIT"`), the inline-table text form (`{ text = "..." }`), else the
+ * first recognized OSI classifier. A `{ file = "..." }` ref is NOT read (we don't crack
+ * the file open here) → null. Null means "none declared" — the caller treats it as
+ * UNLICENSED so it never becomes a false 'none'.
+ */
+export function licenseFromPyproject(text: string): string | null {
+  const section = pyprojectSection(text);
+  if (!section) return null;
+
+  const str = /^\s*license\s*=\s*"([^"]+)"/m.exec(section);
+  if (str) return str[1];
+
+  const inlineText = /^\s*license\s*=\s*\{[^}]*\btext\s*=\s*"([^"]+)"/m.exec(section);
+  if (inlineText) return inlineText[1];
+
+  for (const m of section.matchAll(/License :: OSI Approved :: ([^"]+)"/g)) {
+    const spdx = classifierToSpdx(m[1]);
+    if (spdx) return spdx;
+  }
+  return null;
+}
+
 export interface SuggestedRule {
   decision: 'flag';
   signal: string;
@@ -153,30 +213,54 @@ function readPackageJson(dir: string): Record<string, unknown> | null {
   }
 }
 
+function readTextIfPresent(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Derive an L2 overlay from a local checkout directory (the quick-win path: one repo,
- * one published npm package). Returns null when the checkout has no published identity —
- * we never emit a fact under a key the read path can't resolve. License comes from
- * package.json.license (string), falling back to 'UNLICENSED' → license_risk 'unknown'.
+ * Derive an L2 overlay from a local checkout directory. Tries npm (package.json)
+ * first, then pypi (pyproject.toml) — npm wins when both are present. Returns null
+ * when the checkout has no published identity, so we never emit a fact under a key
+ * the exact-match read path can't resolve. A missing/unrecognized license falls back
+ * to 'UNLICENSED' → license_risk 'unknown' (never a false 'none').
  */
 export function deriveL2FromCheckout(dir: string, opts: DeriveOptions): L2Overlay | null {
+  const maintenance = (extra?: { deprecated?: boolean }) =>
+    maintenanceFromActivity({ ...extra, archived: opts.archived, lastCommitDaysAgo: opts.lastCommitDaysAgo });
+
+  // npm
   const pkgJson = readPackageJson(dir);
-  const identity = packageIdentityFromManifest(pkgJson);
-  if (!identity || !pkgJson) return null;
+  const npmId = packageIdentityFromManifest(pkgJson);
+  if (npmId && pkgJson) {
+    const declared = pkgJson.license;
+    const license = typeof declared === 'string' && declared.trim() ? declared : 'UNLICENSED';
+    return buildDerivedL2({
+      package: npmId.package,
+      ecosystem: npmId.ecosystem,
+      license,
+      maintenance: maintenance({ deprecated: Boolean(pkgJson.deprecated) }),
+      fetchedAt: opts.fetchedAt,
+    });
+  }
 
-  const declared = pkgJson.license;
-  const license = typeof declared === 'string' && declared.trim() ? declared : 'UNLICENSED';
-  const maintenance = maintenanceFromActivity({
-    deprecated: Boolean(pkgJson.deprecated),
-    archived: opts.archived,
-    lastCommitDaysAgo: opts.lastCommitDaysAgo,
-  });
+  // pypi (PEP 621 pyproject.toml)
+  const pyproject = readTextIfPresent(join(dir, 'pyproject.toml'));
+  if (pyproject) {
+    const pyId = packageIdentityFromPyproject(pyproject);
+    if (pyId) {
+      return buildDerivedL2({
+        package: pyId.package,
+        ecosystem: pyId.ecosystem,
+        license: licenseFromPyproject(pyproject) ?? 'UNLICENSED',
+        maintenance: maintenance(),
+        fetchedAt: opts.fetchedAt,
+      });
+    }
+  }
 
-  return buildDerivedL2({
-    package: identity.package,
-    ecosystem: identity.ecosystem,
-    license,
-    maintenance,
-    fetchedAt: opts.fetchedAt,
-  });
+  return null;
 }

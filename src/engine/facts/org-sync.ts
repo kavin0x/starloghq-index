@@ -33,16 +33,21 @@ export interface SyncOptions {
   seedPolicy?: { org?: string; rules?: unknown[] } | null;
 }
 
+/** A directory is a checkout if it has a manifest we can derive from (npm or python). */
+function hasManifest(dir: string): boolean {
+  return existsSync(join(dir, 'package.json')) || existsSync(join(dir, 'pyproject.toml'));
+}
+
 /**
- * List the checkouts under rootDir: immediate subdirectories that contain a
- * package.json, sorted for determinism. If rootDir itself is a package, it is
- * the single checkout.
+ * List the checkouts under rootDir: immediate subdirectories with a manifest we
+ * understand (package.json or pyproject.toml), sorted for determinism. If rootDir
+ * itself is a package, it is the single checkout.
  */
 export function discoverCheckouts(rootDir: string): string[] {
-  if (existsSync(join(rootDir, 'package.json'))) return [rootDir];
+  if (hasManifest(rootDir)) return [rootDir];
   const entries = readdirSync(rootDir, { withFileTypes: true });
   return entries
-    .filter((e) => e.isDirectory() && existsSync(join(rootDir, e.name, 'package.json')))
+    .filter((e) => e.isDirectory() && hasManifest(join(rootDir, e.name)))
     .map((e) => join(rootDir, e.name))
     .sort();
 }

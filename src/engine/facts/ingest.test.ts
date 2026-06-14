@@ -10,6 +10,8 @@ import {
   buildDerivedL2,
   deriveL2FromCheckout,
   suggestL3Rules,
+  packageIdentityFromPyproject,
+  licenseFromPyproject,
 } from './ingest.js';
 import { upsertL2Entry } from './authoring.js';
 import { parseOverlay } from './l2-source.js';
@@ -104,6 +106,43 @@ describe('buildDerivedL2', () => {
   });
 });
 
+describe('packageIdentityFromPyproject', () => {
+  it('maps a PEP 621 [project].name to (name, pypi)', () => {
+    expect(packageIdentityFromPyproject('[project]\nname = "vuln-confidence"\n')).toEqual({ package: 'vuln-confidence', ecosystem: 'pypi' });
+  });
+
+  it('returns null without a [project] table or name (e.g. a name only under [tool.poetry])', () => {
+    expect(packageIdentityFromPyproject('[tool.poetry]\nname = "x"\n')).toBeNull();
+    expect(packageIdentityFromPyproject('[project]\nversion = "1.0"\n')).toBeNull();
+    expect(packageIdentityFromPyproject('')).toBeNull();
+  });
+});
+
+describe('licenseFromPyproject', () => {
+  it('reads the PEP 621 SPDX string form', () => {
+    expect(licenseFromPyproject('[project]\nname = "a"\nlicense = "MIT"\n')).toBe('MIT');
+    expect(licenseFromPyproject('[project]\nlicense = "LicenseRef-Proprietary"\n')).toBe('LicenseRef-Proprietary');
+  });
+
+  it('reads the inline-table { text = ... } form, but not a { file = ... } ref', () => {
+    expect(licenseFromPyproject('[project]\nlicense = { text = "Apache-2.0" }\n')).toBe('Apache-2.0');
+    expect(licenseFromPyproject('[project]\nlicense = { file = "LICENSE" }\n')).toBeNull();
+  });
+
+  it('falls back to an OSI classifier when there is no license field', () => {
+    expect(licenseFromPyproject('[project]\nname="a"\nclassifiers = [\n  "License :: OSI Approved :: MIT License",\n]\n')).toBe('MIT');
+    expect(licenseFromPyproject('[project]\nclassifiers = ["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"]\n')).toBe('GPL-3.0');
+  });
+
+  it('returns null when no license is declared anywhere (→ caller treats as UNLICENSED)', () => {
+    expect(licenseFromPyproject('[project]\nname = "a"\n')).toBeNull();
+  });
+
+  it('does not read a license from outside the [project] table', () => {
+    expect(licenseFromPyproject('[project]\nname = "a"\n[tool.x]\nlicense = "GPL-3.0"\n')).toBeNull();
+  });
+});
+
 describe('suggestL3Rules', () => {
   const base = { package: 'p', license: 'MIT', maintenance: 'active' as const, fetchedAt: '2026-06-10' };
 
@@ -164,6 +203,32 @@ describe('deriveL2FromCheckout', () => {
   it('returns null when the checkout has no published identity (no package.json name)', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ private: true }));
     expect(deriveL2FromCheckout(dir, { fetchedAt: '2026-06-10' })).toBeNull();
+  });
+
+  it('derives a pypi overlay from pyproject.toml when there is no npm package', () => {
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "vuln-confidence"\nlicense = "MIT"\n');
+    const o = deriveL2FromCheckout(dir, { fetchedAt: '2026-06-10', lastCommitDaysAgo: 10 })!;
+    expect(o.package).toBe('vuln-confidence');
+    expect(o.ecosystem).toBe('pypi');
+    expect(o.license).toBe('MIT');
+    expect(o.license_risk).toBe('none');
+    expect(o.maintenance).toBe('active');
+    expect(o.attestation.source).toBe('analyzer');
+  });
+
+  it('a pyproject with no license → UNLICENSED / unknown (honest, not a false none)', () => {
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "armeyes"\n');
+    const o = deriveL2FromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(o.license).toBe('UNLICENSED');
+    expect(o.license_risk).toBe('unknown');
+  });
+
+  it('npm wins when both package.json and pyproject.toml are present', () => {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/dual', license: 'MIT' }));
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "dual_py"\nlicense = "GPL-3.0-only"\n');
+    const o = deriveL2FromCheckout(dir, { fetchedAt: '2026-06-10' })!;
+    expect(o.package).toBe('@acme/dual');
+    expect(o.ecosystem).toBe('npm');
   });
 
   it('falls back to license UNLICENSED → license_risk unknown when none is declared', () => {
