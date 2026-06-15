@@ -112,4 +112,31 @@ describe('starlog org sync (e2e)', () => {
       rmSync(orgDir, { recursive: true, force: true });
     }
   });
+
+  it('errors with a non-zero exit when no checkouts are found', () => {
+    const empty = mkdtempSync(join(tmpdir(), 'org-e2e-empty-'));
+    try {
+      const r = run(['org', 'sync', empty, '--no-git']);
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toMatch(/no checkouts found/i);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it('writes an empty proposal (no flags) when every package is clean', () => {
+    const root = mkdtempSync(join(tmpdir(), 'org-e2e-clean-'));
+    const d = join(root, 'clean');
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'package.json'), JSON.stringify({ name: '@acme/clean', license: 'MIT' }));
+    const policyOut = join(root, 'suggested.json');
+    try {
+      const r = run(['org', 'sync', root, '--facts-out', join(root, 'f.json'), '--corpus-out', join(root, 'c.json'), '--policy-out', policyOut, '--no-git']);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toMatch(/No policy flags suggested/);
+      expect(JSON.parse(readFileSync(policyOut, 'utf8')).rules).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
