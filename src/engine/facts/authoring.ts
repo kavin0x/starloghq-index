@@ -150,6 +150,44 @@ export interface PrivateFactsFile {
   l2: L2Overlay[];
 }
 
+export interface PushPayload {
+  overlays: L2Overlay[];
+  droppedOverlays: number;
+  policy: L3Policy | null;
+  policyInvalid: boolean;
+}
+
+/**
+ * PURE: turn a parsed `facts push` file into the validated payload to send. Reads
+ * `l2` (any extra keys like `l1` are ignored, so a `private-facts.json` works
+ * directly) and `policy`. An optional `policyOverride` (e.g. the adopted
+ * `.starlog/policy.json`, passed via `--policy`) wins over any in-file policy.
+ * Invalid overlays are counted (`droppedOverlays`), never thrown; an invalid
+ * policy yields `policy: null, policyInvalid: true` so the caller can warn rather
+ * than push junk.
+ */
+export function buildPushPayload(fileObj: unknown, policyOverride?: unknown): PushPayload {
+  const obj = fileObj && typeof fileObj === 'object' && !Array.isArray(fileObj) ? (fileObj as Record<string, unknown>) : {};
+  const overlays: L2Overlay[] = [];
+  let droppedOverlays = 0;
+  for (const entry of Array.isArray(obj.l2) ? obj.l2 : []) {
+    const r = L2OverlaySchema.safeParse(entry);
+    if (r.success) overlays.push(r.data);
+    else droppedOverlays++;
+  }
+
+  const policySource = policyOverride !== undefined ? policyOverride : obj.policy;
+  let policy: L3Policy | null = null;
+  let policyInvalid = false;
+  if (policySource !== undefined) {
+    const p = L3PolicySchema.safeParse(policySource);
+    if (p.success) policy = p.data;
+    else policyInvalid = true;
+  }
+
+  return { overlays, droppedOverlays, policy, policyInvalid };
+}
+
 /**
  * Upsert an L2 overlay into the `{ l1, l2 }` private-facts file shape. l1 and
  * unrelated l2 entries are preserved; the same-package l2 entry is replaced.
