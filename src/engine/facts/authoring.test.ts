@@ -3,6 +3,7 @@ import { L2OverlaySchema, L3RuleSchema } from '@starloghq/facts-schema';
 import { CapabilityManifestSchema } from '../../manifest/schema.js';
 import {
   assembleL2,
+  buildPushPayload,
   buildL2FromInput,
   parseVulnFlag,
   upsertL2Entry,
@@ -13,6 +14,42 @@ import {
   upsertPolicy,
   type AddL2Input,
 } from './authoring.js';
+
+describe('buildPushPayload (facts push file → validated {overlays, policy})', () => {
+  const ov = buildL2FromInput({ package: 'x', license: 'MIT', status: 'active' });
+  const pol = { org: 'acme', rules: [{ id: 'pkg-x', decision: 'flag', match: { package: 'x' }, rationale: 'r' }] };
+
+  it('reads valid l2 overlays from the file (and ignores l1 — accepts private-facts.json directly)', () => {
+    const r = buildPushPayload({ l1: [{ package: 'cap' }], l2: [ov] });
+    expect(r.overlays).toHaveLength(1);
+    expect(r.droppedOverlays).toBe(0);
+    expect(r.policy).toBeNull(); // no policy in private-facts.json
+  });
+
+  it('counts invalid overlays as dropped rather than throwing', () => {
+    const r = buildPushPayload({ l2: [ov, { package: 'bad' /* missing required fields */ }] });
+    expect(r.overlays).toHaveLength(1);
+    expect(r.droppedOverlays).toBe(1);
+  });
+
+  it('takes policy from the same file when present', () => {
+    const r = buildPushPayload({ l2: [ov], policy: pol });
+    expect(r.policy?.org).toBe('acme');
+    expect(r.policyInvalid).toBe(false);
+  });
+
+  it('a policy OVERRIDE (e.g. adopted policy.json) wins over the file policy', () => {
+    const adopted = { org: 'acme', rules: [{ id: 'pkg-y', decision: 'deny', match: { package: 'y' }, rationale: 'banned' }] };
+    const r = buildPushPayload({ l2: [ov], policy: pol }, adopted);
+    expect(r.policy?.rules[0].match.package).toBe('y');
+  });
+
+  it('flags an invalid policy instead of pushing junk', () => {
+    const r = buildPushPayload({ l2: [ov] }, { org: 123 /* invalid */ });
+    expect(r.policy).toBeNull();
+    expect(r.policyInvalid).toBe(true);
+  });
+});
 
 describe('assembleL2 (shared L2 construction seam)', () => {
   it('builds a schema-valid overlay, defaulting source=hand + today() + npm + [] + null', () => {

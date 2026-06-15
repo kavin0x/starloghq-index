@@ -17,13 +17,11 @@ import {
   upsertManifestEntry,
   buildL3Rule,
   upsertPolicy,
+  buildPushPayload,
   discoverCheckouts,
   syncCheckouts,
   gitLastCommitDaysAgo,
   today,
-  L2OverlaySchema,
-  L3PolicySchema,
-  type L2Overlay,
 } from './engine/facts.js';
 import { readFileSync } from 'node:fs';
 import { atomicWrite } from './fsutil.js';
@@ -403,53 +401,54 @@ facts
 facts
   .command('push [file]')
   .description("Push your org's private L2 overlays (+ optional L3 policy) to the hosted facts API (needs STARLOG_API_KEY)")
-  .action(action('facts push failed', async (file: string | undefined) => {
+  .option('--policy <file>', 'Also push an L3 policy from this file (e.g. your adopted .starlog/policy.json) — wins over any policy in <file>')
+  .action(action('facts push failed', async (file: string | undefined, opts: { policy?: string }) => {
     const api = createFactsApiClient();
     if (!api) {
       console.error('facts push needs STARLOG_API_KEY (the org key these facts belong to).');
       process.exit(1);
     }
+    // The L2 source: defaults to .starlog/facts.json, but a `.starlog/private-facts.json`
+    // (from `org sync`, shape {l1,l2}) works directly — buildPushPayload reads .l2 and ignores l1.
     const path = file ?? '.starlog/facts.json';
-    let raw: unknown;
-    try {
-      raw = JSON.parse(readFileSync(path, 'utf-8'));
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      const msg = e.code === 'ENOENT' ? `no facts file at ${path}` : `cannot read ${path}: ${e.message}`;
-      console.error(`facts push: ${msg}`);
-      process.exit(1);
-    }
-    const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+    const readJson = (p: string): unknown => {
+      try {
+        return JSON.parse(readFileSync(p, 'utf-8'));
+      } catch (err) {
+        const e = err as NodeJS.ErrnoException;
+        const msg = e.code === 'ENOENT' ? `no file at ${p}` : `cannot read ${p}: ${e.message}`;
+        console.error(`facts push: ${msg}`);
+        process.exit(1);
+      }
+    };
+    const raw = readJson(path);
+    const policyOverride = opts.policy ? readJson(opts.policy) : undefined;
 
-    const overlays: L2Overlay[] = [];
-    for (const entry of Array.isArray(obj.l2) ? obj.l2 : []) {
-      const r = L2OverlaySchema.safeParse(entry);
-      if (r.success) overlays.push(r.data);
-      else console.error('facts push: skipping an invalid L2 overlay (failed schema validation).');
+    const payload = buildPushPayload(raw, policyOverride);
+    if (payload.droppedOverlays > 0) {
+      console.error(`facts push: skipped ${payload.droppedOverlays} invalid L2 overlay(s) (failed schema validation).`);
+    }
+    if (payload.policyInvalid) {
+      console.error('facts push: policy failed schema validation; not pushed.');
     }
 
     let pushedPolicy = false;
-    if (obj.policy !== undefined) {
-      const p = L3PolicySchema.safeParse(obj.policy);
-      if (!p.success) {
-        console.error('facts push: policy failed schema validation; not pushed.');
-      } else {
-        const res = await api.pushPolicy(p.data);
-        if (!res.ok) {
-          console.error(`facts push: policy push failed (${res.error}).`);
-          process.exit(1);
-        }
-        pushedPolicy = true;
+    if (payload.policy) {
+      const res = await api.pushPolicy(payload.policy);
+      if (!res.ok) {
+        console.error(`facts push: policy push failed (${res.error}).`);
+        process.exit(1);
       }
+      pushedPolicy = true;
     }
 
-    const res = await api.pushL2(overlays);
+    const res = await api.pushL2(payload.overlays);
     if (!res.ok) {
       console.error(`facts push: L2 push failed (${res.error}).`);
       process.exit(1);
     }
-    await track('cli_facts_push', { l2_count: overlays.length, policy: pushedPolicy }, { noTelemetry: noTelemetry() });
-    console.log(`Pushed ${res.count ?? overlays.length} L2 overlay(s)${pushedPolicy ? ' + org policy' : ''} to the hosted facts API.`);
+    await track('cli_facts_push', { l2_count: payload.overlays.length, policy: pushedPolicy }, { noTelemetry: noTelemetry() });
+    console.log(`Pushed ${res.count ?? payload.overlays.length} L2 overlay(s)${pushedPolicy ? ' + org policy' : ''} to the hosted facts API.`);
   }));
 
 // ── org: bulk-ingest a directory of internal checkouts ────────────────────────

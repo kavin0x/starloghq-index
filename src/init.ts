@@ -179,7 +179,13 @@ process.stdin.on('end', () => {
     }
     if (!pkgArgs) { process.exit(0); }
 
-    var rawPkgs = pkgArgs.split(/\\s+/).filter(function(a) { return !a.startsWith('-'); });
+    // #29: stop at the first shell operator/redirection so a compound command
+    // (npm i x && echo done; npm pack >/dev/null) can't bleed shell tokens into
+    // the package list, then keep only well-formed package names.
+    var headArgs = pkgArgs.split(/[;&|<>()\`#\\n]/)[0];
+    var rawPkgs = headArgs.split(/\\s+/).filter(function(a) {
+      return a && !a.startsWith('-') && isValidPkgName(a, ecosystem);
+    });
 
     for (var i = 0; i < rawPkgs.length; i++) {
       var originalPkg = rawPkgs[i];
@@ -263,6 +269,24 @@ function normalizeToManifestId(pkg) {
   return pkg.replace(/^@[^\\/]+\\//, '')
     .replace(/\\./g, '-')
     .toLowerCase();
+}
+
+// #29: a token is a real package name only if it matches ecosystem naming rules
+// (after stripping a trailing version/tag). Rejects shell tokens, paths, quotes,
+// and anything with metacharacters — by construction, since the grammars below
+// allow only [a-z0-9._-] plus one optional npm scope slash.
+function isValidPkgName(name, ecosystem) {
+  if (!name) return false;
+  var n = String(name);
+  if (ecosystem === 'pypi') {
+    n = n.split(/[<>=!~;\\[]/)[0];
+  } else {
+    var at = n.lastIndexOf('@');
+    if (at > 0) n = n.slice(0, at); // strip trailing @version/@tag, keep leading scope
+  }
+  if (!n || n.length > 214) return false;
+  if (ecosystem === 'pypi') return /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/i.test(n);
+  return /^(@[a-z0-9][a-z0-9._-]*\\/)?[a-z0-9][a-z0-9._-]*$/i.test(n);
 }
 
 function findManifest(id) {

@@ -464,3 +464,14 @@ describe('starlog facts CLI — self-heal init nudge (e2e)', () => {
     expect(stderr).not.toContain('starlog init');
   });
 });
+
+describe('facts push — flag wiring (hermetic, no key)', () => {
+  it('accepts the --policy flag and reaches the API-key guard (proves it is registered)', () => {
+    // No STARLOG_API_KEY in the child env → the action's guard fires. If --policy
+    // were not a registered option, commander would instead error "unknown option".
+    const { status, stderr } = runFacts(['push', 'some-facts.json', '--policy', 'some-policy.json']);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain('STARLOG_API_KEY');
+    expect(stderr).not.toMatch(/unknown option/i);
+  });
+});
