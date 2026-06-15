@@ -140,6 +140,17 @@ describe('licenseFromPyproject', () => {
     expect(licenseFromPyproject('[project]\nclassifiers = ["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"]\n')).toBe('GPL-3.0');
   });
 
+  it('maps the rest of the common OSI classifiers to SPDX', () => {
+    const cls = (c: string) => licenseFromPyproject(`[project]\nclassifiers = ["License :: OSI Approved :: ${c}"]\n`);
+    expect(cls('Apache Software License')).toBe('Apache-2.0');
+    expect(cls('BSD License')).toBe('BSD-3-Clause');
+    expect(cls('ISC License (ISCL)')).toBe('ISC');
+    expect(cls('GNU Affero General Public License v3')).toBe('AGPL-3.0');
+    expect(cls('GNU Lesser General Public License v3 (LGPLv3)')).toBe('LGPL-3.0');
+    expect(cls('Mozilla Public License 2.0 (MPL 2.0)')).toBe('MPL-2.0');
+    expect(cls('Public Domain')).toBeNull(); // unrecognized → null (caller → UNLICENSED)
+  });
+
   it('returns null when no license is declared anywhere (→ caller treats as UNLICENSED)', () => {
     expect(licenseFromPyproject('[project]\nname = "a"\n')).toBeNull();
   });
@@ -238,6 +249,8 @@ describe('detectLicenseFromText (LICENSE-file fallback)', () => {
     expect(detectLicenseFromText('Apache License\nVersion 2.0, January 2004')).toBe('Apache-2.0');
     expect(detectLicenseFromText('MIT License\n\nPermission is hereby granted, free of charge, to any person')).toBe('MIT');
     expect(detectLicenseFromText('Mozilla Public License Version 2.0')).toBe('MPL-2.0');
+    expect(detectLicenseFromText('ISC License\n\nPermission to use, copy, modify, and/or distribute this software')).toBe('ISC');
+    expect(detectLicenseFromText('BSD 3-Clause License\n\nRedistribution and use in source and binary forms, with or without modification')).toBe('BSD-3-Clause');
   });
 
   it('returns null for empty or unrecognizable text (never a false positive)', () => {
