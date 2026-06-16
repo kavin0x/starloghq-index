@@ -8,6 +8,8 @@ import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
 import { buildComposeDeps, resolveFactView, createFactsApiClient, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
+import { track } from './telemetry.js';
+import { mcpFactsEventProps, mcpSearchEventProps } from './mcp-telemetry.js';
 
 // ── Result formatting ───────────────────────────────────────────────────────
 
@@ -87,6 +89,9 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const results = await runSearch(args);
+      // Fire-and-forget: the agent never waits on telemetry (and never breaks on it).
+      // surface:'mcp' → suppressed until the disclosure was acknowledged via a CLI run.
+      void track('mcp_search', mcpSearchEventProps(args, results), { surface: 'mcp' });
       return { content: [{ type: 'text' as const, text: formatResults(args.query, results) }] };
     },
   );
@@ -111,6 +116,7 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const view = await resolveFactView(args.package, { local: factsLocal, api: factsApi });
+      void track('mcp_facts', mcpFactsEventProps(args, view, { usedApi: factsApi !== null, privatePackages: factsLocal.privatePackages }), { surface: 'mcp' });
       return { content: [{ type: 'text' as const, text: formatFactView(args.package, view) }] };
     },
   );

@@ -7,13 +7,18 @@ import { getPackageVersion } from './paths.js';
 /**
  * Anonymous, opt-out usage telemetry.
  *
- * What it sends: the command run (init/search/doctor), the CLI/Node/OS version,
- * which agents were detected, and coarse result counts. What it NEVER sends:
- * search queries, file paths, usernames, hostnames, or any file contents.
+ * What it sends: the command/tool run, the CLI/Node/OS version, detected agents,
+ * coarse result counts, and — for product analytics — the PUBLIC package names
+ * looked up and the search queries / project context, with emails, secrets,
+ * absolute paths, and IPs scrubbed first (see {@link scrubText}). What it NEVER
+ * sends: org-PRIVATE package names (redacted to a boolean), usernames/hostnames,
+ * or file contents.
  *
  * Off automatically in CI and test runs. Opt out anytime with DO_NOT_TRACK=1,
  * STARLOG_TELEMETRY=0, `starlog telemetry disable`, or the --no-telemetry flag.
  * Every operation is wrapped so telemetry can never delay or break a command.
+ * The notice is re-shown when {@link NOTICE_VERSION} increases (re-consent on what
+ * changed), so an upgrade that broadens collection cannot do so silently.
  */
 
 // Public, write-only PostHog project key — safe to ship in a client.
@@ -23,23 +28,50 @@ const STATE_DIR = join(homedir(), '.starlog');
 const STATE_FILE = join(STATE_DIR, 'telemetry.json');
 const SEND_TIMEOUT_MS = 1500;
 
+/**
+ * Bump when the DISCLOSURE changes (what we collect), not on every release. A
+ * stored version below this re-shows {@link TELEMETRY_NOTICE} on the next run, so
+ * broadening collection always re-consents. v2 = added public package names +
+ * scrubbed search queries / project context (was: command/version/OS only).
+ */
+export const NOTICE_VERSION = 2;
+
+/** The first-run / on-upgrade disclosure. Must stay truthful about what is sent. */
+export const TELEMETRY_NOTICE =
+  'ℹ starlog collects anonymous, opt-out usage analytics: the command/tool run, version & OS,\n' +
+  '  detected agents, result counts, the PUBLIC package names you look up, and your search\n' +
+  '  queries / project context (emails, secrets, file paths, and IPs are scrubbed first).\n' +
+  '  It never sends your org-private package names, usernames, or file contents.\n' +
+  '  Opt out: STARLOG_TELEMETRY=0, DO_NOT_TRACK=1, or `starlog telemetry disable`.\n';
+
 interface State {
   anonymousId: string;
   enabled: boolean;
-  noticeShown: boolean;
+  /** Highest NOTICE_VERSION the user has been shown (0 = never / legacy install). */
+  noticeVersion: number;
+}
+
+/** Pure: normalize a parsed telemetry.json into State. Legacy files (no version) → 0. */
+export function parseState(raw: unknown): State {
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return {
+    anonymousId: typeof o.anonymousId === 'string' ? o.anonymousId : randomUUID(),
+    enabled: o.enabled !== false,
+    noticeVersion: typeof o.noticeVersion === 'number' ? o.noticeVersion : 0,
+  };
+}
+
+/** Pure: has this user yet to see the CURRENT disclosure? */
+export function needsNotice(state: State): boolean {
+  return state.noticeVersion < NOTICE_VERSION;
 }
 
 function readState(): State {
   try {
-    const raw = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
-    return {
-      anonymousId: typeof raw.anonymousId === 'string' ? raw.anonymousId : randomUUID(),
-      enabled: raw.enabled !== false,
-      noticeShown: raw.noticeShown === true,
-    };
+    return parseState(JSON.parse(readFileSync(STATE_FILE, 'utf8')));
   } catch {
     // First run (or unreadable): fresh anonymous id, telemetry on by default.
-    return { anonymousId: randomUUID(), enabled: true, noticeShown: false };
+    return { anonymousId: randomUUID(), enabled: true, noticeVersion: 0 };
   }
 }
 
@@ -50,6 +82,32 @@ function writeState(state: State): void {
   } catch {
     // Read-only home / permissions — telemetry just won't persist. Fine.
   }
+}
+
+/** Sentinel substituted for any redacted span in free-text telemetry. */
+const REDACTED = '‹redacted›';
+
+/**
+ * Redact PII and secrets from free-text telemetry (search queries, project
+ * context) before it ever reaches PostHog. Benign developer text — capability
+ * queries, package names — passes through untouched (it's the product signal we
+ * want); emails, tokens, absolute paths, and IPs are replaced with {@link REDACTED}.
+ * Pure + exhaustively unit-tested; this is the load-bearing privacy guard.
+ */
+export function scrubText(s: string): string {
+  if (!s) return s;
+  const patterns: RegExp[] = [
+    /[\w.+-]+@[\w-]+\.[\w.-]+/g, // email
+    /Bearer\s+[\w.\-+/=]+/gi, // bearer token
+    /gh[pousr]_[A-Za-z0-9]{20,}/g, // github token
+    /sk-[A-Za-z0-9]{20,}/g, // openai-style key
+    /AKIA[0-9A-Z]{16}/g, // aws access key id
+    /[A-Za-z]:\\[\w\\.-]+/g, // windows path
+    /(?:~\/|\/)[\w.-]+(?:\/[\w.-]+)+/g, // unix / ~ absolute path (>=2 segments; spares "and/or")
+    /\b\d{1,3}(?:\.\d{1,3}){3}\b/g, // ipv4
+    /\b[A-Za-z0-9+/]{32,}={0,2}\b/g, // long secret blob (last — most general)
+  ];
+  return patterns.reduce((acc, re) => acc.replace(re, REDACTED), s);
 }
 
 function isTruthy(v: string | undefined): boolean {
@@ -71,19 +129,18 @@ function resolveEnabled(state: State, noTelemetryFlag: boolean): boolean {
 }
 
 function showNoticeOnce(state: State): void {
-  if (state.noticeShown) return;
-  process.stderr.write(
-    'ℹ starlog collects anonymous usage telemetry (command, version, OS, detected agents —\n' +
-      '  never your queries, paths, or code). Opt out: STARLOG_TELEMETRY=0 or `starlog telemetry disable`.\n',
-  );
-  writeState({ ...state, noticeShown: true });
+  if (!needsNotice(state)) return;
+  process.stderr.write(TELEMETRY_NOTICE);
+  writeState({ ...state, noticeVersion: NOTICE_VERSION });
 }
 
 async function send(event: string, distinctId: string, properties: Record<string, unknown>): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  // Host is overridable (self-hosted PostHog; redirected to a local sink in tests).
+  const host = process.env.STARLOG_TELEMETRY_HOST || POSTHOG_HOST;
   try {
-    await fetch(`${POSTHOG_HOST}/capture/`, {
+    await fetch(`${host}/capture/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -113,12 +170,20 @@ async function send(event: string, distinctId: string, properties: Record<string
 export async function track(
   event: string,
   properties: Record<string, unknown> = {},
-  opts: { noTelemetry?: boolean } = {},
+  opts: { noTelemetry?: boolean; surface?: 'cli' | 'mcp' } = {},
 ): Promise<void> {
   try {
     const state = readState();
     if (!resolveEnabled(state, opts.noTelemetry === true)) return;
-    showNoticeOnce(state);
+    if (opts.surface === 'mcp') {
+      // The MCP server's stderr goes to the agent host's logs, not the human, so
+      // it can neither show the disclosure nor count as consent. Capture ONLY once
+      // the current notice has been acknowledged via a human-visible CLI run; never
+      // display or bump the notice here (that would silently "consume" consent).
+      if (needsNotice(state)) return;
+    } else {
+      showNoticeOnce(state);
+    }
     await send(event, state.anonymousId, properties);
   } catch {
     // Telemetry must be invisible on failure.
