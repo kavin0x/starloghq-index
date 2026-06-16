@@ -449,6 +449,9 @@ facts
     }
     await track('cli_facts_push', { l2_count: payload.overlays.length, policy: pushedPolicy }, { noTelemetry: noTelemetry() });
     console.log(`Pushed ${res.count ?? payload.overlays.length} L2 overlay(s)${pushedPolicy ? ' + org policy' : ''} to the hosted facts API.`);
+    // Exit explicitly: the fetch keep-alive pool would otherwise hold the event
+    // loop open for seconds after the work is done, so the CLI appears to hang.
+    process.exit(0);
   }));
 
 // ── org: bulk-ingest a directory of internal checkouts ────────────────────────

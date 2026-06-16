@@ -1,9 +1,10 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:http';
 
 /**
  * End-to-end tests for the `starlog facts` CLI command.
@@ -474,4 +475,135 @@ describe('facts push — flag wiring (hermetic, no key)', () => {
     expect(stderr).toContain('STARLOG_API_KEY');
     expect(stderr).not.toMatch(/unknown option/i);
   });
+});
+
+/**
+ * CLIENT push contract — drives the real binary's `facts push --policy` against a
+ * LOCAL http server standing in for the hosted facts API, and asserts the bytes
+ * on the wire: which endpoints, the Bearer auth, and the exact {overlays}/policy
+ * bodies. This closes the org-sync → push bridge's "logic unit-tested, wiring
+ * untested" gap WITHOUT the real backend.
+ *
+ * Scope (deliberately narrow): this proves the CLIENT emits a correct request —
+ * NOT that the production backend accepts it. The live round-trip is still gated
+ * on the backend validator accepting attestation.source 'analyzer' (tracked in
+ * .planning/roadmap-notes.md), which is out of this repo. Partial-failure paths
+ * (l2 fails after policy ok, non-OK status) are covered by the pushL2/pushPolicy
+ * unit tests; here we stay happy-path.
+ *
+ * Why async spawn (not execFileSync): the stand-in server runs on THIS process's
+ * event loop, and execFileSync would block that loop → the server could never
+ * accept the connection → deadlock. So we spawn async and await 'close' while the
+ * same loop services the requests.
+ */
+interface CapturedReq { method: string; url: string; auth: string | undefined; body: any }
+
+/**
+ * Async spawn that resolves on the child's natural exit, with an optional `until`
+ * stdout-match as a SAFETY fallback (resolve + SIGKILL if the line appears but the
+ * process never exits). `facts push` is expected to exit on its own now — it calls
+ * process.exit(0) after a successful push specifically because undici's keep-alive
+ * pool would otherwise hold the event loop open. So the contract test below waits
+ * for the REAL exit (status 0) rather than the sentinel; the fallback only guards
+ * against a future regression of that lingering-exit.
+ */
+function runFactsAsync(args: string[], env: Record<string, string>, until?: RegExp): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const childEnv: Record<string, string | undefined> = { ...process.env, STARLOG_NO_NUDGE: '1' };
+    delete childEnv.STARLOG_PRIVATE_FACTS;
+    delete childEnv.STARLOG_API_KEY;
+    delete childEnv.STARLOG_API_URL;
+    delete childEnv.STARLOG_POLICY;
+    Object.assign(childEnv, env); // explicit test env (incl. the fake key/url) wins
+    const child = spawn('node', [CLI, '--no-telemetry', 'facts', ...args], { cwd: REPO, env: childEnv });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const finish = (status: number) => {
+      if (settled) return;
+      settled = true;
+      try { child.kill('SIGKILL'); } catch { /* already gone */ }
+      resolve({ status, stdout, stderr });
+    };
+    child.stdout.on('data', (d) => {
+      stdout += d.toString();
+      if (until && until.test(stdout)) finish(0);
+    });
+    child.stderr.on('data', (d) => (stderr += d.toString()));
+    child.on('close', (code) => finish(typeof code === 'number' ? code : -1));
+    child.on('error', () => finish(-1));
+  });
+}
+
+describe('facts push — client contract against a local API stand-in', () => {
+  let tmpDir: string | null = null;
+  afterEach(() => {
+    if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = null;
+  });
+
+  it('pushes l2 (l1 ignored) + the adopted --policy to the right endpoints with Bearer auth', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'starlog-push-contract-'));
+
+    // org-sync's private-facts.json shape: { l1, l2 }. l1 must be IGNORED by push.
+    const factsPath = join(tmpDir, 'private-facts.json');
+    const l2 = (pkg: string) => ({
+      package: pkg, ecosystem: 'npm', known_vulns: [], license: 'MIT', license_risk: 'none',
+      maintenance: 'active', transitive_risk: null,
+      attestation: { source: 'analyzer', refs: ['org-sync'], fetched_at: '2026-06-01' },
+    });
+    writeFileSync(factsPath, JSON.stringify({
+      l1: [{ package: '@acme/a', ecosystem: 'npm', effect_surface: 'x', capabilities: [] }], // must NOT be pushed
+      l2: [l2('@acme/a'), l2('@acme/b')],
+    }));
+
+    // The ADOPTED policy lives in a SEPARATE file (--policy) — the org-sync bridge case.
+    const policyPath = join(tmpDir, 'policy.json');
+    const adoptedPolicy = { org: 'acme', rules: [{ id: 'r1', decision: 'flag', match: { package: '@acme/a' }, rationale: 'pin pending review' }] };
+    writeFileSync(policyPath, JSON.stringify(adoptedPolicy));
+
+    const captured: CapturedReq[] = [];
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        captured.push({ method: req.method ?? '', url: req.url ?? '', auth: req.headers.authorization, body: body ? JSON.parse(body) : undefined });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{}');
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+    const port = (server.address() as { port: number }).port;
+
+    try {
+      const { status, stdout, stderr } = await runFactsAsync(
+        ['push', factsPath, '--policy', policyPath],
+        { STARLOG_API_KEY: 'test-key', STARLOG_API_URL: `http://127.0.0.1:${port}` },
+        /Pushed \d+ L2 overlay/, // safety fallback only — push should exit 0 on its own
+      );
+
+      expect(stderr).toBe('');
+      expect(status).toBe(0); // proves the CLI exits cleanly after a push (no hang)
+      expect(stdout).toMatch(/Pushed 2 L2 overlay\(s\) \+ org policy/);
+
+      const policyReq = captured.find((r) => r.url === '/facts/policy');
+      const l2Req = captured.find((r) => r.url === '/facts/l2');
+      expect(policyReq).toBeDefined();
+      expect(l2Req).toBeDefined();
+
+      // Auth: Bearer <key> on every request.
+      expect(captured.every((r) => r.auth === 'Bearer test-key')).toBe(true);
+
+      // Policy endpoint got the ADOPTED policy from --policy (not from the facts file).
+      expect(policyReq!.method).toBe('POST');
+      expect(policyReq!.body).toEqual(adoptedPolicy);
+
+      // L2 endpoint got { overlays: [...] } — the two l2 records, l1 dropped entirely.
+      expect(l2Req!.method).toBe('POST');
+      expect(l2Req!.body.overlays.map((o: { package: string }) => o.package).sort()).toEqual(['@acme/a', '@acme/b']);
+      expect(JSON.stringify(l2Req!.body)).not.toContain('effect_surface'); // no l1 leaked onto the wire
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 20_000);
 });
