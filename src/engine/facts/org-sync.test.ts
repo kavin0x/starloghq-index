@@ -105,6 +105,72 @@ describe('syncCheckouts', () => {
   });
 });
 
+/**
+ * Edge cases that CHARACTERIZE current behavior — including known limits. A green
+ * test here documents what the code does today (so a regression is visible); it
+ * does NOT assert the behavior is the desired end-state. The monorepo and the
+ * cross-checkout name collision are real-world inputs an org will hit; both are
+ * tracked as follow-ups (monorepo is on .planning/roadmap-notes.md).
+ */
+describe('syncCheckouts / discoverCheckouts — edge cases (characterizing current limits)', () => {
+  let root: string;
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'orgsync-edge-')); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('two checkouts publishing the SAME package name collapse to one (last wins) AND surface a collision', () => {
+    // A fork + its upstream, or a rename mid-migration, can present the same npm
+    // name twice. upsertL2Entry keys by package, so the SECOND derivation replaces
+    // the first. That last-wins collapse is unavoidable for a single overlay, but
+    // it must NOT be silent — the collision is reported so the caller can warn.
+    const first = repo(root, 'first', { name: '@acme/dup', license: 'MIT' });
+    const second = repo(root, 'second', { name: '@acme/dup', license: 'GPL-3.0-only' });
+
+    const res = syncCheckouts(
+      [{ dir: first, lastCommitDaysAgo: 1 }, { dir: second, lastCommitDaysAgo: 1 }],
+      { fetchedAt: '2026-06-10' },
+    );
+
+    const dups = res.privateFacts.l2.filter((o) => o.package === '@acme/dup');
+    expect(dups).toHaveLength(1); // collapsed to one
+    expect(dups[0].license).toBe('GPL-3.0-only'); // the LAST checkout's facts won
+    expect(res.derived.map((d) => d.package)).toEqual(['@acme/dup', '@acme/dup']); // both were processed
+    expect(res.collisions).toEqual([{ package: '@acme/dup', dirs: [first, second] }]); // reported, not silent
+  });
+
+  it('a name derived from only one checkout is NOT a collision', () => {
+    const a = repo(root, 'a', { name: '@acme/a', license: 'MIT' });
+    const b = repo(root, 'b', { name: '@acme/b', license: 'MIT' });
+    const res = syncCheckouts([{ dir: a, lastCommitDaysAgo: 1 }, { dir: b, lastCommitDaysAgo: 1 }], { fetchedAt: '2026-06-10' });
+    expect(res.collisions).toEqual([]);
+  });
+
+  it('polyglot repo (named package.json AND pyproject.toml): the npm identity wins', () => {
+    // derivePackageFromCheckout checks npm first and only falls through to pyproject
+    // when there is no usable npm name — so a repo carrying both is derived as npm.
+    const dir = join(root, 'poly');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/poly', license: 'MIT' }));
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "acme-poly-py"\nlicense = "MIT"\n');
+
+    const res = syncCheckouts([{ dir, lastCommitDaysAgo: 1 }], { fetchedAt: '2026-06-10' });
+
+    expect(res.privateFacts.l2.map((o) => o.package)).toEqual(['@acme/poly']);
+    expect(res.privateFacts.l2[0].ecosystem).toBe('npm');
+  });
+
+  it('LIMIT: a workspace/monorepo ROOT is treated as one checkout — sub-packages are NOT discovered', () => {
+    // discoverCheckouts is depth-1: if the root itself has a manifest it returns
+    // ONLY the root. A pnpm/npm-workspace root (root package.json + packages/*)
+    // therefore yields a single derivation and the member packages are missed.
+    // Monorepo traversal is a tracked roadmap item — this pins the current gap.
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: '@acme/workspace-root', private: true, workspaces: ['packages/*'] }));
+    repo(join(root, 'packages'), 'a', { name: '@acme/a', license: 'MIT' });
+    repo(join(root, 'packages'), 'b', { name: '@acme/b', license: 'MIT' });
+
+    expect(discoverCheckouts(root)).toEqual([root]); // members @acme/a, @acme/b not reached
+  });
+});
+
 describe('gitLastCommitDaysAgo', () => {
   it('returns a non-negative number for a real git repo (this repo), null for a non-repo', () => {
     const repoRoot = join(import.meta.dirname, '..', '..', '..');

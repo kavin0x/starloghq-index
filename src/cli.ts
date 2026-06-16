@@ -507,6 +507,11 @@ org
         { noTelemetry: noTelemetry() },
       );
 
+      for (const c of res.collisions) {
+        console.warn(
+          `Warning: "${c.package}" was derived from ${c.dirs.length} checkouts (${c.dirs.join(', ')}); kept the last. Rename or de-duplicate the repos so you don't lose the others' facts.`,
+        );
+      }
       console.log(`Scanned ${dirs.length} checkout(s): derived ${res.derived.length} package fact(s), skipped ${res.skipped.length} (no published name).`);
       console.log(`Wrote ${res.privateFacts.l2.length} L2 overlay(s) to ${opts.factsOut} — your agent vets these by name after \`starlog init\`.`);
       console.log(`Made ${res.corpus.manifests.length} package(s) DISCOVERABLE → ${opts.corpusOut} — \`search\` surfaces these by capability.`);

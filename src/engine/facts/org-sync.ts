@@ -29,6 +29,13 @@ export interface SyncResult {
   /** Packages derived as facts but NOT made discoverable (no usable description). */
   noDescription: string[];
   skipped: string[];
+  /**
+   * Packages whose name was derived from MORE than one checkout in this run — the
+   * later derivation overwrote the earlier (upsert keys by package), so only the
+   * last survives. Surfaced (not silently dropped) so a fork/rename collision is
+   * visible and the caller can warn.
+   */
+  collisions: { package: string; dirs: string[] }[];
 }
 
 export interface SyncOptions {
@@ -91,6 +98,10 @@ export function syncCheckouts(checkouts: Checkout[], opts: SyncOptions): SyncRes
   const derived: { package: string; flagged: boolean }[] = [];
   const noDescription: string[] = [];
   const skipped: string[] = [];
+  // Track which checkout dir(s) each package name was derived from THIS run, so a
+  // name produced by two checkouts (the second silently replacing the first via
+  // upsert) becomes a reported collision rather than invisible data loss.
+  const derivedFrom = new Map<string, string[]>();
 
   for (const co of checkouts) {
     const pkg = derivePackageFromCheckout(co.dir, {
@@ -103,6 +114,9 @@ export function syncCheckouts(checkouts: Checkout[], opts: SyncOptions): SyncRes
       continue;
     }
     const { overlay, solves, keywords } = pkg;
+    const priorDirs = derivedFrom.get(overlay.package);
+    if (priorDirs) priorDirs.push(co.dir);
+    else derivedFrom.set(overlay.package, [co.dir]);
     privateFacts = upsertL2Entry(privateFacts, overlay);
 
     const suggestions = suggestL3Rules(overlay);
@@ -133,7 +147,10 @@ export function syncCheckouts(checkouts: Checkout[], opts: SyncOptions): SyncRes
 
   const policy: L3Policy | null =
     policyShape && Array.isArray(policyShape.rules) && policyShape.rules.length > 0 ? (policyShape as L3Policy) : null;
-  return { privateFacts, policy, corpus, derived, noDescription, skipped };
+  const collisions = [...derivedFrom.entries()]
+    .filter(([, dirs]) => dirs.length > 1)
+    .map(([pkg, dirs]) => ({ package: pkg, dirs }));
+  return { privateFacts, policy, corpus, derived, noDescription, skipped, collisions };
 }
 
 /**
