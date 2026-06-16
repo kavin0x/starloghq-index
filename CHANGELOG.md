@@ -2,6 +2,15 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.6.0
+
+Product analytics for the surface that matters. The MCP tools (`starlog_facts`, `starlog_search`) — the way AI agents actually use Starlog — now emit anonymous usage events, so we can see real usage and improve the corpus around it.
+
+- **MCP-surface telemetry.** `starlog_facts` → `mcp_facts` (hit/miss, ecosystem, vuln/license/maintenance signal, org policy decision) and `starlog_search` → `mcp_search` (result count, top score, category/stack). Fire-and-forget — the agent never waits on, or breaks because of, telemetry.
+- **Broadened, scrubbed collection.** Now captures the package names you vet — including public ones we don't yet index (the "what to add next" signal) — and your **search queries / project context**, with emails, secrets/tokens, absolute paths, and IPs scrubbed before send (`scrubText`, exhaustively tested). **Org-private** package names (resolved from a `STARLOG_PRIVATE_FACTS` overlay) are never sent — redacted to a boolean.
+- **Honest re-consent.** The first-run notice is rewritten to disclose exactly this, and is **re-shown on upgrade** (`NOTICE_VERSION`) so a broadened collection can never happen silently. Because the MCP server can't show a human a notice, **MCP-tool analytics stay suppressed until the current notice has been acknowledged via a CLI run** — no silent capture on the surface that's newly instrumented. Opt-out is unchanged (`STARLOG_TELEMETRY=0`, `DO_NOT_TRACK=1`, `starlog telemetry disable`, `--no-telemetry`) and still default-off in CI/tests.
+- `STARLOG_TELEMETRY_HOST` env override (self-hosted PostHog / testability).
+
 ## 0.5.0
 
 Onboard a whole org without hand-authoring a fact per repo. The new `starlog org sync` walks a directory of internal checkouts and **derives** their facts locally — so your AI agent can vet *and* discover your private packages, not just public ones.
