@@ -2,7 +2,7 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
-## 0.6.0
+## 0.5.1
 
 Product analytics for the surface that matters. The MCP tools (`starlog_facts`, `starlog_search`) — the way AI agents actually use Starlog — now emit anonymous usage events, so we can see real usage and improve the corpus around it.
 
