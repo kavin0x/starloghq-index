@@ -169,6 +169,24 @@ describe('syncCheckouts / discoverCheckouts — edge cases (characterizing curre
 
     expect(discoverCheckouts(root)).toEqual([root]); // members @acme/a, @acme/b not reached
   });
+
+  it('a checkout with a MALFORMED manifest is skipped, not fatal (one bad repo cannot abort the sync)', () => {
+    // readPackageJson swallows the parse error → no identity → the checkout lands
+    // in `skipped`. A single corrupt package.json in a big org must not throw and
+    // kill the whole run; the good repos still derive.
+    const bad = join(root, 'broken');
+    mkdirSync(bad, { recursive: true });
+    writeFileSync(join(bad, 'package.json'), '{ name: "@acme/oops", '); // truncated/invalid JSON
+    const good = repo(root, 'good', { name: '@acme/good', license: 'MIT' });
+
+    let res!: ReturnType<typeof syncCheckouts>;
+    expect(() => {
+      res = syncCheckouts([{ dir: bad, lastCommitDaysAgo: 1 }, { dir: good, lastCommitDaysAgo: 1 }], { fetchedAt: '2026-06-10' });
+    }).not.toThrow();
+
+    expect(res.skipped).toEqual([bad]); // the corrupt one is skipped
+    expect(res.privateFacts.l2.map((o) => o.package)).toEqual(['@acme/good']); // the good one still derived
+  });
 });
 
 describe('gitLastCommitDaysAgo', () => {
