@@ -17,6 +17,8 @@ import { L2_BY_PACKAGE, L2_OVERLAYS_LIST } from './l2-data.js';
 export interface ServiceDeps extends ComposeDeps {
   /** Ordered, de-duplicated package keys the name resolver scans (corpus first). */
   resolverKeys: string[];
+  /** Names that came from the org-private STARLOG_PRIVATE_FACTS overlay — telemetry redacts these. */
+  privatePackages: ReadonlySet<string>;
 }
 
 // ── Name resolution (the matcher) ────────────────────────────────────────────
@@ -120,7 +122,8 @@ export function buildComposeDeps(env: NodeJS.ProcessEnv = process.env): ServiceD
   // Corpus (L1) order first — preserves first-match-wins precedence the eval
   // baseline encodes — then any L2-only / private-only keys.
   const resolverKeys = uniqueOrder(Object.keys(mergedL1), L2_OVERLAYS_LIST.map((o) => o.package), Object.keys(priv.l2));
-  return { l1Lookup: (p) => mergedL1[p] ?? null, l2Source, policy, resolverKeys };
+  const privatePackages = new Set<string>([...Object.keys(priv.l1), ...Object.keys(priv.l2)]);
+  return { l1Lookup: (p) => mergedL1[p] ?? null, l2Source, policy, resolverKeys, privatePackages };
 }
 
 /** Resolve a free-text query to a composed FactView (LOCAL-only, sync), or null. */

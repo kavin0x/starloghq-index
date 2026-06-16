@@ -238,14 +238,23 @@ Unit and e2e tests cover schema validation, corpus loading + integrity, facts/fo
 
 ## Telemetry
 
-Starlog collects **anonymous, opt-out** usage telemetry to understand which
-commands and capabilities are used. It sends: the command run
-(`init`/`facts`/`search`/`doctor`), the CLI/Node/OS version, which agents were
-detected, and coarse result counts. It **never** sends your queries, package
-names, file paths, usernames, hostnames, or any file contents. It's also disabled
-automatically in CI and test runs.
+Starlog collects **anonymous, opt-out** usage analytics to understand which
+commands, tools, and packages are used. It sends: the command/tool run
+(`init`/`facts`/`search`/`doctor` and the `starlog_facts`/`starlog_search` MCP
+tools), the CLI/Node/OS version, detected agents, coarse result counts, the
+**public** package names you look up, and your **search queries / project
+context** — with emails, secrets/tokens, absolute file paths, and IP addresses
+**scrubbed before send**.
 
-A one-line notice is printed on first run. Opt out at any time:
+It **never** sends your **org-private** package names (those are redacted to a
+boolean when you use a private overlay), your username/hostname, or any file
+contents. It's also disabled automatically in CI and test runs.
+
+A notice is printed on first run and **re-shown whenever the disclosure changes**
+(so a broadened collection can never happen silently). Because the MCP server has
+no way to show you a notice, **MCP-tool analytics stay off until you've seen the
+current notice via a CLI run** (e.g. `starlog init` during setup). Opt out at any
+time:
 
 ```bash
 starlog telemetry disable          # persistent opt-out
