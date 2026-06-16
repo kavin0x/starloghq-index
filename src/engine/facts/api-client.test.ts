@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { parseFactsApiResponse, createFactsApiClient } from './api-client.js';
 import type { L2Overlay } from '@starloghq/facts-schema';
 
@@ -35,7 +35,15 @@ describe('parseFactsApiResponse — defensive envelope reader', () => {
 });
 
 describe('createFactsApiClient', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  // Hermetic env: createFactsApiClient falls back to process.env.STARLOG_API_KEY
+  // when opts.apiKey is undefined (api-client.ts), so a key exported in the dev/CI
+  // shell would otherwise make the "no key → null" case pass-or-fail on ambient
+  // state. Stub it empty so the guard is exercised deterministically everywhere.
+  beforeEach(() => vi.stubEnv('STARLOG_API_KEY', ''));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it('returns null when no key is configured', () => {
     expect(createFactsApiClient({ apiKey: undefined, baseUrl: 'http://t' })).toBeNull();

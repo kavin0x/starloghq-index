@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -110,6 +110,34 @@ describe('starlog org sync (e2e)', () => {
       expect(adopted.stdout).toMatch(/Org policy:\*\*\s*FLAG/);
     } finally {
       rmSync(orgDir, { recursive: true, force: true });
+    }
+  });
+
+  it('warns on stderr when two checkouts derive the SAME package name (no silent data loss)', () => {
+    // spawnSync (not the run() helper): run() discards stderr on a zero exit, but a
+    // collision is a WARNING with status 0 — so stderr is exactly what we assert on.
+    const root = mkdtempSync(join(tmpdir(), 'org-e2e-dup-'));
+    const mk = (sub: string, pkg: Record<string, unknown>) => {
+      const d = join(root, sub);
+      mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, 'package.json'), JSON.stringify(pkg));
+    };
+    mk('upstream', { name: '@acme/dup', license: 'MIT' });
+    mk('fork', { name: '@acme/dup', license: 'GPL-3.0-only' });
+    const factsOut = join(root, 'f.json');
+    const env: Record<string, string | undefined> = { ...process.env, STARLOG_NO_NUDGE: '1' };
+    delete env.STARLOG_PRIVATE_FACTS;
+    delete env.STARLOG_API_KEY;
+    delete env.STARLOG_POLICY;
+    try {
+      const r = spawnSync('node', [CLI, 'org', 'sync', root, '--facts-out', factsOut, '--corpus-out', join(root, 'c.json'), '--policy-out', join(root, 'p.json'), '--no-git', '--no-telemetry'], { cwd: REPO, env, encoding: 'utf8' });
+      expect(r.status).toBe(0); // a collision is a warning, not a failure
+      expect(r.stderr).toMatch(/"@acme\/dup" was derived from 2 checkouts/);
+      // Still collapses to a single overlay (the last checkout's facts).
+      const facts = JSON.parse(readFileSync(factsOut, 'utf8'));
+      expect(facts.l2.filter((o: { package: string }) => o.package === '@acme/dup')).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 
