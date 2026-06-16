@@ -120,6 +120,17 @@ describe('MCP telemetry wiring (e2e, real wire)', () => {
     expect(typeof ev.properties.result_count).toBe('number');
   }, 20_000);
 
+  it('fires EXACTLY ONE event per tool call (guards against a double-started server)', async () => {
+    // dist/cli.js bundles mcp.ts — whose run-if-main guard must stay INERT in that
+    // bundle, or `node dist/cli.js mcp` starts two servers on one stdio and every
+    // tool call (work AND telemetry) runs twice. One call must yield one event.
+    const sink = await captureServer();
+    const client = await connectMcp(sink.url, { acknowledged: true });
+    await client.callTool({ name: 'starlog_facts', arguments: { package: 'ua-parser-js' } });
+    await new Promise((r) => setTimeout(r, 900)); // give any duplicate ample time to arrive
+    expect(sink.events.filter((e) => e.event === 'mcp_facts')).toHaveLength(1);
+  }, 20_000);
+
   it('captures NOTHING until the disclosure is acknowledged (no silent MCP capture)', async () => {
     const sink = await captureServer();
     const client = await connectMcp(sink.url, { acknowledged: false }); // never saw the notice
