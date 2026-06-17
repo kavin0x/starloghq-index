@@ -1,4 +1,5 @@
 import { loadCorpus } from './engine/corpus.js';
+import { fetchHostedCorpus } from './engine/hosted-corpus.js';
 import { loadPrivateCorpus } from './engine/private-corpus.js';
 import { search } from './engine/search.js';
 import { keywordSiftrank, createLlmFn } from './engine/siftrank.js';
@@ -24,7 +25,11 @@ export interface SearchArgs {
 export async function runSearch(args: SearchArgs): Promise<QueryResult[]> {
   const { query, category, stack, top_k, diversity_lambda, context } = args;
 
-  const corpus = await loadCorpus(undefined, category as Category | undefined);
+  // Full (hosted) corpus tier when STARLOG_API_KEY is set: the candidate set
+  // comes from api.starlog.dev/search; ranking stays 100% local. Falls back to
+  // the bundled corpus on no-key / any API failure — keyless users unaffected.
+  const hosted = await fetchHostedCorpus(query, category);
+  const corpus = hosted ?? (await loadCorpus(undefined, category as Category | undefined));
 
   // FACTS-03 discovery overlay: load the org's private manifests from
   // STARLOG_PRIVATE_CORPUS (mirror of STARLOG_PRIVATE_FACTS). This is the ONLY
