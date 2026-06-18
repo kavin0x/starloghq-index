@@ -144,7 +144,14 @@ function invokedDirectly(): boolean {
   const entry = process.argv[1];
   if (entry === undefined) return false;
   try {
-    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+    const self = fileURLToPath(import.meta.url);
+    // CRITICAL: this module is also BUNDLED into dist/cli.js (cli.ts imports
+    // startMcpServer). In that bundle `import.meta.url` resolves to cli.js, so
+    // without this name check the guard would fire on `node dist/cli.js mcp` —
+    // starting a SECOND server alongside the `mcp` command's, doubling every tool
+    // call (work and telemetry). Only the standalone mcp entry may auto-start.
+    if (!/[/\\]mcp\.(js|ts)$/.test(self)) return false;
+    return realpathSync(entry) === realpathSync(self);
   } catch {
     return false;
   }

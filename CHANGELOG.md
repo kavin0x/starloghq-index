@@ -2,6 +2,10 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.5.2
+
+- **fix(mcp): `node dist/cli.js mcp` started two MCP servers.** `mcp.ts`'s run-if-main guard fired inside the `cli.js` bundle (where `import.meta.url` is `cli.js`), so a second server ran alongside the `mcp` command's — every tool call executed **twice** (double `resolveFactView`/`runSearch` and, as of 0.5.1, double telemetry). Now the guard requires its own module URL to be the `mcp` entry, staying inert when bundled into `cli.js`. Standalone `dist/mcp.js` still auto-starts. Caught by the new MCP telemetry (one call → two events).
+
 ## 0.5.1
 
 Product analytics for the surface that matters. The MCP tools (`starlog_facts`, `starlog_search`) — the way AI agents actually use Starlog — now emit anonymous usage events, so we can see real usage and improve the corpus around it.
