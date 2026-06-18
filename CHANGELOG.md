@@ -2,6 +2,10 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.5.3
+
+- **MCP analytics now self-disclose instead of waiting on a CLI run.** In 0.5.1 the MCP tools stayed silent until the new telemetry notice was acknowledged via a CLI command — which meant the *entire existing install base* (all on a legacy `noticeVersion`) and agent-only users (who rarely touch the CLI) were never captured, undercounting exactly the population the events exist to observe. Now, on an unacknowledged install, the MCP server **appends the one-line disclosure to its first tool result** (the channel your agent actually relays to you), captures **nothing** on that call, self-acknowledges, and begins recording from the next call. No CLI run required; still nothing collected before you're shown what's collected. Opt-out unchanged.
+
 ## 0.5.2
 
 - **fix(mcp): `node dist/cli.js mcp` started two MCP servers.** `mcp.ts`'s run-if-main guard fired inside the `cli.js` bundle (where `import.meta.url` is `cli.js`), so a second server ran alongside the `mcp` command's — every tool call executed **twice** (double `resolveFactView`/`runSearch` and, as of 0.5.1, double telemetry). Now the guard requires its own module URL to be the `mcp` entry, staying inert when bundled into `cli.js`. Standalone `dist/mcp.js` still auto-starts. Caught by the new MCP telemetry (one call → two events).

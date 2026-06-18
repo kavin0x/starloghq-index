@@ -44,6 +44,16 @@ export const TELEMETRY_NOTICE =
   '  It never sends your org-private package names, usernames, or file contents.\n' +
   '  Opt out: STARLOG_TELEMETRY=0, DO_NOT_TRACK=1, or `starlog telemetry disable`.\n';
 
+/**
+ * One-line disclosure the MCP server appends to its FIRST tool result on an
+ * unacknowledged install. Unlike the CLI (stderr → terminal), the MCP server
+ * reaches the human through the tool result the agent relays — so this is the
+ * channel that makes MCP consent honest without a CLI run. Kept to one line so it
+ * doesn't drown the actual answer.
+ */
+export const MCP_DISCLOSURE_LINE =
+  '_ℹ starlog records anonymous, opt-out usage analytics (the package looked up, your scrubbed query/context — never org-private names or secrets) to improve the index. Opt out: `starlog telemetry disable` or STARLOG_TELEMETRY=0._';
+
 interface State {
   anonymousId: string;
   enabled: boolean;
@@ -164,6 +174,27 @@ async function send(event: string, distinctId: string, properties: Record<string
 }
 
 /**
+ * MCP consent, self-served: if telemetry is ON and the current disclosure hasn't
+ * been acknowledged, return the one-line {@link MCP_DISCLOSURE_LINE} for the caller
+ * to surface in the tool result (the human-visible channel) AND mark it
+ * acknowledged. Returns null when telemetry is opted out (nothing to disclose) or
+ * already acknowledged. The caller suppresses telemetry on the call that returns a
+ * line — the human sees the notice in that response; capture starts next call.
+ * Never throws.
+ */
+export function pendingMcpDisclosure(): string | null {
+  try {
+    const state = readState();
+    if (!resolveEnabled(state, false)) return null; // opted out → collecting nothing → disclose nothing
+    if (!needsNotice(state)) return null; // already shown the current disclosure
+    writeState({ ...state, noticeVersion: NOTICE_VERSION }); // self-acknowledge: we're surfacing it now
+    return MCP_DISCLOSURE_LINE;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fire one telemetry event. Never throws, never blocks meaningfully (capped at
  * SEND_TIMEOUT_MS). Safe to `await` at the end of a command.
  */
@@ -176,10 +207,10 @@ export async function track(
     const state = readState();
     if (!resolveEnabled(state, opts.noTelemetry === true)) return;
     if (opts.surface === 'mcp') {
-      // The MCP server's stderr goes to the agent host's logs, not the human, so
-      // it can neither show the disclosure nor count as consent. Capture ONLY once
-      // the current notice has been acknowledged via a human-visible CLI run; never
-      // display or bump the notice here (that would silently "consume" consent).
+      // Backstop: never capture before the disclosure has been surfaced. The MCP
+      // handler calls pendingMcpDisclosure() first — which shows the notice in the
+      // tool result and acknowledges it — so by the NEXT call this is satisfied.
+      // The handler also skips track() on the disclosing call itself.
       if (needsNotice(state)) return;
     } else {
       showNoticeOnce(state);

@@ -131,13 +131,22 @@ describe('MCP telemetry wiring (e2e, real wire)', () => {
     expect(sink.events.filter((e) => e.event === 'mcp_facts')).toHaveLength(1);
   }, 20_000);
 
-  it('captures NOTHING until the disclosure is acknowledged (no silent MCP capture)', async () => {
+  it('self-discloses in the FIRST result and captures nothing; the NEXT call captures', async () => {
+    // The MCP server can now establish consent itself: on an unacknowledged install
+    // the first tool result carries the disclosure (the agent relays it to the
+    // human) and that call sends NOTHING; from the next call on, it captures.
     const sink = await captureServer();
     const client = await connectMcp(sink.url, { acknowledged: false }); // never saw the notice
-    await client.callTool({ name: 'starlog_facts', arguments: { package: 'ua-parser-js' } });
 
-    // Give the (suppressed) fire-and-forget telemetry ample time to NOT fire.
-    await new Promise((r) => setTimeout(r, 1500));
-    expect(sink.events).toEqual([]); // the gate held — no event left the process
+    const r1 = await client.callTool({ name: 'starlog_facts', arguments: { package: 'ua-parser-js' } });
+    const text1 = (r1.content as { text?: string }[]).map((c) => c.text ?? '').join('');
+    expect(text1).toMatch(/anonymous, opt-out usage analytics/i); // human sees the disclosure in the result
+    await new Promise((r) => setTimeout(r, 800));
+    expect(sink.events).toEqual([]); // the disclosing call itself captured nothing
+
+    // Second call: self-acknowledged now → it captures (no CLI run required).
+    await client.callTool({ name: 'starlog_facts', arguments: { package: 'ua-parser-js' } });
+    const ev = await sink.waitFor('mcp_facts');
+    expect(ev.properties.package).toBe('ua-parser-js');
   }, 20_000);
 });
