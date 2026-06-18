@@ -2,6 +2,10 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.6.0
+
+- **Full hosted corpus tier for `starlog_search`.** The package bundles only the small `corpus-free` tier; with `STARLOG_API_KEY` set, `runSearch` now pulls the candidate set from the hosted full corpus (`api.starlog.dev/search`) and ranks it with the **same local engine** — a key widens *what* can be found, never *how* it's scored. Mirrors the facts client: Bearer auth, short abort timeout, defensive parsing, **never throws** — any hosted failure (no key, network, non-200, garbage body) silently degrades to the bundled corpus, so keyless users are unaffected.
+
 ## 0.5.3
 
 - **MCP analytics now self-disclose instead of waiting on a CLI run.** In 0.5.1 the MCP tools stayed silent until the new telemetry notice was acknowledged via a CLI command — which meant the *entire existing install base* (all on a legacy `noticeVersion`) and agent-only users (who rarely touch the CLI) were never captured, undercounting exactly the population the events exist to observe. Now, on an unacknowledged install, the MCP server **appends the one-line disclosure to its first tool result** (the channel your agent actually relays to you), captures **nothing** on that call, self-acknowledges, and begins recording from the next call. No CLI run required; still nothing collected before you're shown what's collected. Opt-out unchanged.
