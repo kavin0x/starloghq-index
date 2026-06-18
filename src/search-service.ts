@@ -18,9 +18,11 @@ export interface SearchArgs {
  * Execute a capability search, shared by both the MCP server and the CLI so
  * the two transports behave identically.
  *
- * Loads the local corpus and ranks with the offline keyword ranker — no key,
- * no network. Pass `context` to enrich the top results with a per-library
- * `vs custom` rationale.
+ * Keyless: ranks the bundled local corpus with the offline keyword ranker — no
+ * network. With STARLOG_API_KEY set, the candidate set is fetched from the hosted
+ * full corpus (api.starlog.dev/search) and ranked locally with the SAME engine;
+ * any hosted failure degrades to the local corpus. Pass `context` to enrich the
+ * top results with a per-library `vs custom` rationale.
  */
 export async function runSearch(args: SearchArgs): Promise<QueryResult[]> {
   const { query, category, stack, top_k, diversity_lambda, context } = args;

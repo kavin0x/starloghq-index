@@ -159,7 +159,7 @@ starlog search "auth for a Next.js app"
 2   Clerk               authentication    60.64   Provides a fully managed authentication and user management platfor...
 ```
 
-Search uses the **local keyword ranker** — no API key, no network. Scores are absolute (a strong match lands in the 70s–80s), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer.
+Search **ranks locally** with the keyword ranker — scores are absolute (a strong match lands in the 70s–80s), so a query outside the indexed categories returns *"no strong match"* rather than a confident wrong answer. Keyless, the candidate set is the bundled corpus (no network). With `STARLOG_API_KEY` set, candidates come from the **hosted full corpus** (`api.starlog.dev/search`) and are ranked by the same local engine — so a key widens *what* can be found, never *how* it's scored; any hosted hiccup silently falls back to the bundled corpus.
 
 ```
 --category <cat>    Filter by category (authentication, feature-flags, etc.)
