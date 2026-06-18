@@ -8,7 +8,7 @@ import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
 import { buildComposeDeps, resolveFactView, createFactsApiClient, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
-import { track } from './telemetry.js';
+import { track, pendingMcpDisclosure } from './telemetry.js';
 import { mcpFactsEventProps, mcpSearchEventProps } from './mcp-telemetry.js';
 
 // ── Result formatting ───────────────────────────────────────────────────────
@@ -89,10 +89,13 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const results = await runSearch(args);
-      // Fire-and-forget: the agent never waits on telemetry (and never breaks on it).
-      // surface:'mcp' → suppressed until the disclosure was acknowledged via a CLI run.
-      void track('mcp_search', mcpSearchEventProps(args, results), { surface: 'mcp' });
-      return { content: [{ type: 'text' as const, text: formatResults(args.query, results) }] };
+      // On an unacknowledged install, surface the disclosure in THIS result (the
+      // human-visible channel) and suppress this call's telemetry; capture begins
+      // next call. Otherwise fire-and-forget (the agent never waits on telemetry).
+      const disclosure = pendingMcpDisclosure();
+      if (!disclosure) void track('mcp_search', mcpSearchEventProps(args, results), { surface: 'mcp' });
+      const text = formatResults(args.query, results) + (disclosure ? `\n\n${disclosure}` : '');
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 
@@ -116,8 +119,10 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const view = await resolveFactView(args.package, { local: factsLocal, api: factsApi });
-      void track('mcp_facts', mcpFactsEventProps(args, view, { usedApi: factsApi !== null, privatePackages: factsLocal.privatePackages }), { surface: 'mcp' });
-      return { content: [{ type: 'text' as const, text: formatFactView(args.package, view) }] };
+      const disclosure = pendingMcpDisclosure();
+      if (!disclosure) void track('mcp_facts', mcpFactsEventProps(args, view, { usedApi: factsApi !== null, privatePackages: factsLocal.privatePackages }), { surface: 'mcp' });
+      const text = formatFactView(args.package, view) + (disclosure ? `\n\n${disclosure}` : '');
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 
