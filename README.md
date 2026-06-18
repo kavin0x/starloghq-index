@@ -251,10 +251,10 @@ boolean when you use a private overlay), your username/hostname, or any file
 contents. It's also disabled automatically in CI and test runs.
 
 A notice is printed on first run and **re-shown whenever the disclosure changes**
-(so a broadened collection can never happen silently). Because the MCP server has
-no way to show you a notice, **MCP-tool analytics stay off until you've seen the
-current notice via a CLI run** (e.g. `starlog init` during setup). Opt out at any
-time:
+(so a broadened collection can never happen silently). Through the MCP tools, the
+server **includes the disclosure in its first tool result** (which your agent
+relays to you) and only begins recording from the next call — so MCP analytics are
+never collected before you've been shown what's collected. Opt out at any time:
 
 ```bash
 starlog telemetry disable          # persistent opt-out
