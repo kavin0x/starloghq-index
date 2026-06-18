@@ -196,7 +196,9 @@ Starlog vets a package as **three independent layers, composed at query time** �
 
 `starlog facts <pkg>` composes the three for the caller and returns them — or an honest miss — over the **MCP server**, the **CLI**, or the **install hook**. The corpus is local and cacheable; override or extend any layer with `STARLOG_PRIVATE_FACTS` (internal packages, license rulings) and `STARLOG_POLICY`. The full contract: [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
 
-Discovery (`starlog_search`) is a separate surface: it ranks capability manifests with an offline keyword ranker against each library's `solves` / `best_for` / `stack_affinity`, reporting an *absolute* score so an out-of-corpus query returns "no strong match" instead of a forced result. When your agent installs a package with no manifest yet, the hook queues it (`.starlog/pending.json`) for coverage.
+Discovery (`starlog_search`) is a separate surface: it ranks capability manifests against each library's `solves` / `best_for` / `stack_affinity` with a local keyword ranker, reporting an *absolute* score so an out-of-corpus query returns "no strong match" instead of a forced result. The candidate set is the bundled corpus, or — with `STARLOG_API_KEY` set — the hosted full corpus, ranked by the same local engine either way. When your agent installs a package with no manifest yet, the hook queues it (`.starlog/pending.json`) for coverage.
+
+For the full picture — surfaces, engine, data sources, and what telemetry leaves the machine — see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** (with diagrams).
 
 ## Does it change the agent's decision?
 
