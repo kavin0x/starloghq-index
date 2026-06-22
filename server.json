@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.starloghq/starlog",
-  "description": "Authoritative facts (CVEs, license, maintenance) so your AI coding agent vets a package before using it, plus capability discovery. Local, no account.",
-  "version": "0.5.0",
+  "description": "Vet a package (CVEs, license, maintenance) before your AI agent uses it, plus capability discovery.",
+  "version": "0.6.0",
   "repository": {
     "url": "https://github.com/starloghq/index",
     "source": "github"
@@ -12,7 +12,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "starloghq",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "transport": {
         "type": "stdio"
       },
@@ -25,7 +25,7 @@
       "environmentVariables": [
         {
           "name": "STARLOG_API_KEY",
-          "description": "Optional. Enables experimental hosted ranking; the server runs fully locally without it.",
+          "description": "Optional. Unlocks the hosted full-corpus search tier + hosted facts API; the server runs fully locally without it.",
           "isRequired": false,
           "isSecret": true
         }

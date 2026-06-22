@@ -14,9 +14,11 @@ manifests; the rest is submission + launch work.
 
 Both manifests depend on the `starlog mcp` subcommand (added in 0.1.8). Keep the
 `version` fields in `server.json` in sync with `package.json` at release time.
-As of **0.5.0** both `server.json` version fields are synced to 0.5.0 and the
-description matches the current facts/vetting positioning — a registry re-publish
-(`mcp-publisher publish`) is the remaining step to surface 0.5.0 in the listing.
+As of **0.6.0** both `server.json` version fields are synced to 0.6.0. Note the
+registry now caps `description` at **100 chars** (a longer one fails publish with a
+422), so `server.json`'s description is its own short form, separate from the
+longer npm `package.json` one. A registry re-publish (`mcp-publisher publish`)
+surfaces the current version in the listing.
 
 ## Submission checklist
 
@@ -26,8 +28,10 @@ description matches the current facts/vetting positioning — a registry re-publ
       `mcpName` field; every release since does too). Re-run `mcp-publisher publish`
       after each release to bump the listed version. Namespace auth requires
       **public** `starloghq` org membership (publicized for `basicScandal`).
-      **Pending: re-publish 0.5.0** — `server.json` is synced; run
-      `mcp-publisher login github && mcp-publisher publish` from the repo root.
+      **Re-publish on each release** — `server.json` is synced to 0.6.0; run
+      `mcp-publisher login github && mcp-publisher publish` from the repo root
+      (login is an interactive GitHub device flow; the JWT expires, so re-login
+      before publishing).
 - [x] **awesome-mcp-servers** — PR [#7250](https://github.com/punkpeye/awesome-mcp-servers/pull/7250)
       (awaiting maintainer merge).
 - [ ] **Smithery** — connect the `starloghq/index` repo at smithery.ai; it reads
