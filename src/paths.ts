@@ -21,3 +21,18 @@ export function getPackageVersion(): string {
   const pkg = JSON.parse(readFileSync(join(getPackageRoot(), 'package.json'), 'utf8'));
   return pkg.version as string;
 }
+
+/**
+ * User-Agent for hosted-API calls (`api.starlog.dev`). A stable, identifiable UA
+ * keeps the client off Cloudflare bot heuristics (a UA-less request can trip a
+ * WAF/Bot-Fight rule and silently 1010 the hosted tier behind the local
+ * fallback). Never throws — falls back to an unversioned UA if package.json
+ * can't be read, since the hosted clients must never break a command.
+ */
+export function getUserAgent(): string {
+  try {
+    return `starlog-cli/${getPackageVersion()}`;
+  } catch {
+    return 'starlog-cli';
+  }
+}
