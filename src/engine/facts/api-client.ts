@@ -8,6 +8,7 @@ import {
   type L3Policy,
 } from '@starloghq/facts-schema';
 import { telemetryAnonId } from '../../telemetry.js';
+import { getUserAgent } from '../../paths.js';
 
 /**
  * Client for the hosted facts API (the starlog-api worker). Matches the
@@ -81,6 +82,7 @@ class FactsApiClientImpl implements FactsApiClient {
         ...init,
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
+          'User-Agent': getUserAgent(),
           // Relay the anonymous CLI id so the server can alias this install to
           // the GitHub person at key issuance. Omitted entirely when telemetry
           // is opted out (anonId === null).

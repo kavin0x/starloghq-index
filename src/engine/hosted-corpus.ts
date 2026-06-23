@@ -1,4 +1,5 @@
 import { CapabilityManifestSchema, type CapabilityManifest } from '../manifest/schema.js';
+import { getUserAgent } from '../paths.js';
 
 /**
  * Hosted corpus fetch — the full (paid) corpus tier.
@@ -44,7 +45,7 @@ export async function fetchHostedCorpus(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await doFetch(`${baseUrl}/search?${params}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: { Authorization: `Bearer ${apiKey}`, 'User-Agent': getUserAgent() },
       signal: controller.signal,
     });
     if (!res.ok) {
