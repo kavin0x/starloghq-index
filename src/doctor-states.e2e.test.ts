@@ -209,6 +209,30 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
     expect(stdout).toContain('resolves');
   });
 
+  // 2d. LEGACY HOOK — a self-contained hook installed before the runtime-shim
+  //     migration (no dist/hook-runner.js marker) passes --check and still runs,
+  //     so it reports [ok] "script present and valid" — but its logic is frozen
+  //     inline and never refreshes on upgrade. doctor must warn and point at the
+  //     one-command fix (re-run init to adopt the shim), so an upgraded user on an
+  //     old (possibly since-fixed) hook is never left silently blessed.
+  it('warns to re-init when the installed hook is the legacy self-contained form', () => {
+    const { home, cwd } = freshDirs();
+    const hooksDir = join(home, '.claude', 'hooks');
+    mkdirSync(hooksDir, { recursive: true });
+    // Valid JS, but NO 'hook-runner.js' marker → doctor treats it as legacy inline.
+    writeFileSync(join(hooksDir, 'starlog-pkg-check.js'), '// self-contained legacy hook\nprocess.exit(0)\n', 'utf8');
+    writeSettings(home, {
+      mcpServers: {},
+      hooks: { PostToolUse: [{ matcher: '', hooks: [{ type: 'command', command: 'node ' + join(hooksDir, 'starlog-pkg-check.js') }] }] },
+    });
+    const { stdout } = runDoctor(cwd, home);
+    expect(stdout).toContain('Hook logic');
+    expect(stdout).toContain('legacy self-contained hook');
+    expect(stdout).toContain('starlog init');
+    // The [ok] script line still prints — the warning is additive, not a replacement.
+    expect(stdout).toContain('script present and valid');
+  });
+
   // 3. CORRUPT settings.json — flagged as invalid, NOT mistaken for "not configured".
   // Malformed bytes ('{ broken json ') must surface a '[x]  settings.json — invalid JSON ('
   // problem with 'fix or remove' + 'starlog init' guidance, exit 1. Crucially, doctor
