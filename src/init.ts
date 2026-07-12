@@ -188,7 +188,10 @@ process.stdin.on('end', () => {
     });
 
     for (var i = 0; i < rawPkgs.length; i++) {
-      var originalPkg = rawPkgs[i];
+      // Strip the trailing version/tag (npm pkg@1.2.3, pypi pkg==1.0) BEFORE
+      // lookup/display/queueing — otherwise a pinned install of a covered
+      // package (e.g. ua-parser-js@0.7.29) misses its facts entirely.
+      var originalPkg = stripVersionSpec(rawPkgs[i], ecosystem);
       var pkg = normalizeToManifestId(originalPkg);
       const manifestPath = findManifest(pkg) || findManifest(pkg.replace(/-/g, ''));
 
@@ -264,6 +267,18 @@ process.stdin.on('end', () => {
   }
   process.exit(0);
 });
+
+// Strip a trailing version/tag so every downstream use (facts lookup, the
+// displayed name, the starlog_facts suggestion, the pending-queue manifest_id)
+// keys on the real package name. npm: pkg@1.2.3 / @scope/pkg@next (the leading
+// scope @ is preserved); pypi: pkg==1.0 / pkg>=2 / pkg[extra]. Mirrors the
+// stripping isValidPkgName applies for validation.
+function stripVersionSpec(name, ecosystem) {
+  var n = String(name);
+  if (ecosystem === 'pypi') return n.split(/[<>=!~;\\[]/)[0];
+  var at = n.lastIndexOf('@');
+  return at > 0 ? n.slice(0, at) : n;
+}
 
 function normalizeToManifestId(pkg) {
   return pkg.replace(/^@[^\\/]+\\//, '')
