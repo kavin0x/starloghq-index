@@ -2,6 +2,14 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.7.1
+
+Three fixes from a full feature audit (every user-facing behaviour tested against the built CLI/MCP server/hook — the audit lives in `docs/feature-audit.csv`).
+
+- **fix(hook): version-pinned installs now hit the facts lookup.** The install hook stripped nothing from `pkg@1.2.3` / `pkg==1.0`, so a pinned install of a covered package missed its facts entirely — `npm install ua-parser-js@0.7.29` (one of the exact hijacked versions the corpus warns about) reported *"No facts on file"*, suggested the unresolvable `starlog_facts ua-parser-js@0.7.29`, and queued mangled ids like `requests==2-31-0`. The hook now strips the trailing npm `@version`/tag (leading `@scope` preserved) and pypi `==`/`>=`/`~=`/`[extra]` specifiers before the lookup, the displayed name, the `starlog_facts` suggestion, and the pending-queue `manifest_id`. **Upgrading the package does not refresh an already-installed hook — re-run `starlog init` after upgrading** (it detects the drift and shows `[~ update]`). New installs get the fixed hook automatically.
+- **fix(search): table columns no longer collide.** Library/Category column widths now grow with the data plus a 2-space gutter, so a long name like `Flagsmith JavaScript Client` no longer runs into its category with no separator.
+- **fix(search): `--top-k` is validated.** Zero/negative/non-numeric values are rejected with a clear error and exit 1, instead of silently defaulting to 5 or printing a misleading *"No strong match"* when matches exist.
+
 ## 0.7.0
 
 - **Internal-traffic marker for analytics (`STARLOG_INTERNAL`).** Set `STARLOG_INTERNAL=1` on dev machines / CI-with-telemetry and events now carry `$internal_or_test_user` — both as an event property (PostHog's built-in test-user filter) and via `$set` as a person property (the "Internal / Test users" cohort) — so founder/test runs are excluded from product analytics. On a low-traffic project our own runs otherwise dominate the funnels. **Off by default**: real users are unaffected, nothing new is collected, and the opt-out env vars are unchanged.
