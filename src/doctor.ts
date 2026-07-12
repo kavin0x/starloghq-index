@@ -214,6 +214,18 @@ async function checkHook(settings: Record<string, unknown> | null): Promise<Chec
           ? { level: 'ok', label: 'Hook logic', detail: 'hook-runner.js resolves — upgrades refresh behaviour with no re-init' }
           : { level: 'fail', label: 'Hook logic', detail: `shim cannot load its logic (${runnerPath} missing) — re-run \`starlog init\`` },
       );
+    } else {
+      // A legacy self-contained hook (installed before the runtime-shim migration)
+      // still carries its logic inline, so a package upgrade never refreshes it —
+      // the user keeps whatever hook shipped with the version they first init'd,
+      // including any since-fixed bug. `--check` passes and it still runs, so the
+      // check above reports [ok]; without this the user is never told they're
+      // frozen on old behaviour. Warn (not fail) and point at the one-command fix.
+      checks.push({
+        level: 'warn',
+        label: 'Hook logic',
+        detail: 'legacy self-contained hook — it will not auto-refresh on upgrade; re-run `starlog init` to adopt the shim (zero-touch upgrades)',
+      });
     }
   } else {
     checks.push({ level: 'fail', label: 'PostToolUse hook', detail: 'registered in settings but script file is missing' });
