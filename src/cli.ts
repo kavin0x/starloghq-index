@@ -117,6 +117,14 @@ program
       process.exit(1);
     }
 
+    // Validate --top-k: a non-numeric or non-positive value would otherwise
+    // silently default (5) or return an empty set that reads as a misleading
+    // "no strong match". Reject it loudly instead (parity with the MCP schema).
+    if (!/^\d+$/.test(String(opts.topK)) || Number.parseInt(opts.topK as string, 10) < 1) {
+      console.error(`Invalid --top-k "${opts.topK}". Use a positive integer (e.g. 5).`);
+      process.exit(1);
+    }
+
     // Shared search service: delegates to the hosted API when STARLOG_API_KEY
     // is set, otherwise runs the local engine — and falls back to local on API
     // failure (parity with the MCP server).
