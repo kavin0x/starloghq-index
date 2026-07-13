@@ -1,6 +1,6 @@
 {
   "name": "starloghq",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "mcpName": "io.github.starloghq/starlog",
   "description": "Better library decisions for your AI coding agent — a local MCP tool and package-install hook that indexes library capabilities. Free, no account.",
   "keywords": [
