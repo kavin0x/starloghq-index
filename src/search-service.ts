@@ -12,6 +12,13 @@ export interface SearchArgs {
   top_k?: number;
   diversity_lambda?: number;
   context?: string;
+  /**
+   * Explicit private-corpus path. The CLI supplies this (env value, or a
+   * discovered project-local `.starlog/`); the MCP server omits it and the env
+   * var is used. Lets the CLI reach the same private-first corpus without an
+   * `export`, while runSearch stays identical for both transports.
+   */
+  privateCorpusPath?: string;
 }
 
 /**
@@ -33,11 +40,11 @@ export async function runSearch(args: SearchArgs): Promise<QueryResult[]> {
   const hosted = await fetchHostedCorpus(query, category);
   const corpus = hosted ?? (await loadCorpus(undefined, category as Category | undefined));
 
-  // FACTS-03 discovery overlay: load the org's private manifests from
-  // STARLOG_PRIVATE_CORPUS (mirror of STARLOG_PRIVATE_FACTS). This is the ONLY
-  // place env is read for the corpus overlay — CLI and MCP both call runSearch,
-  // so both transports get private-first for free. Empty when env unset/degraded.
-  const priv = loadPrivateCorpus(process.env.STARLOG_PRIVATE_CORPUS);
+  // FACTS-03 discovery overlay: load the org's private manifests. CLI and MCP both
+  // call runSearch, so both get private-first for free. The MCP server omits
+  // privateCorpusPath and the baked env var is used; the CLI passes an explicit
+  // path (env value or a discovered project-local `.starlog/`).
+  const priv = loadPrivateCorpus(args.privateCorpusPath ?? process.env.STARLOG_PRIVATE_CORPUS);
 
   // Merge private manifests into the searched corpus, private WINS on id
   // collision (mirrors the "private wins per layer" semantics of buildComposeDeps).
