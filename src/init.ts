@@ -51,14 +51,18 @@ export function desiredMcpServer(apiKey?: string) {
   // environment, so a shell `export STARLOG_PRIVATE_*` never reaches it. Bake the
   // overlay locations into the server's own `env` block instead.
   //
-  // Claude Code expands `${CLAUDE_PROJECT_DIR}` to the session's project root and
-  // sets it in the spawned server's environment, so this ONE global entry resolves
-  // to EACH project's own `.starlog/` at runtime — per-project private discovery
-  // (STARLOG_PRIVATE_CORPUS) + vetting (STARLOG_PRIVATE_FACTS) + policy, with no
-  // cross-project leak and no working-directory dependency. When a project has no
-  // such file the loaders no-op (empty / public-only), so baking these
-  // unconditionally is safe: author `.starlog/*` in any project and the agent
-  // picks it up there, with nothing to re-run.
+  // NOTE: Claude Code does NOT expand `${CLAUDE_PROJECT_DIR}` inside an mcpServers
+  // `env` value — `${VAR}` expansion runs at config-parse time from Claude Code's
+  // OWN environment, where CLAUDE_PROJECT_DIR is unset, so the token reaches the
+  // server LITERAL. Claude Code does, however, inject CLAUDE_PROJECT_DIR (= the
+  // session's project root) into the spawned server's process.env, so the loaders
+  // expand this token themselves at read time via resolveOverlayPath(). That keeps
+  // this ONE global entry resolving to EACH project's own `.starlog/` at runtime —
+  // per-project discovery (STARLOG_PRIVATE_CORPUS) + vetting (STARLOG_PRIVATE_FACTS)
+  // + policy, with no cross-project leak and no working-directory dependency. When a
+  // project has no such file the loaders no-op (empty / public-only), so baking these
+  // unconditionally is safe: author `.starlog/*` in any project and the agent picks
+  // it up there, with nothing to re-run.
   const PROJ = '${CLAUDE_PROJECT_DIR}';
   const env: Record<string, string> = {
     STARLOG_PRIVATE_FACTS: `${PROJ}/.starlog/private-facts.json`,
