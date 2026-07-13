@@ -2,6 +2,11 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.7.2
+
+- **fix(mcp): private overlays wired with `${CLAUDE_PROJECT_DIR}` now actually load.** `starlog init` bakes `${CLAUDE_PROJECT_DIR}/.starlog/{private-facts,private-corpus,policy}.json` into the MCP server's `env` block, but Claude Code does **not** expand `${CLAUDE_PROJECT_DIR}` there — `${VAR}` expansion runs at config-parse time from Claude Code's own environment, where the variable is unset, so the token reached the server **literal** and every private overlay silently degraded to public-only (the only signal was a stderr warning the MCP stdio channel discards). Claude Code *does* inject `CLAUDE_PROJECT_DIR` into the spawned server's `process.env`, so the loaders (`loadPrivateCorpus`, `loadPrivateFacts`, `loadPolicy`) now resolve the token themselves at read time — plus `~` and project-relative paths. This repairs already-wired installs with **no re-init**. (#57)
+- **fix(doctor): "Private overlays wired" now verifies the path resolves to this project.** The wiring check reported `[ok]` on mere presence of the env keys, so a stale absolute path or a cross-project leak — the agent silently reading a *different* project's `.starlog/` — passed as healthy. `doctor` now resolves each wired env path exactly as the server will (expanding `${CLAUDE_PROJECT_DIR}` to the project root) and warns when it doesn't land on this project's `.starlog/`, instead of asserting a green it can't stand behind. (#58)
+
 ## 0.7.1
 
 Fixes and upgrade hardening from a full feature audit (every user-facing behaviour tested against the built CLI/MCP server/hook — the audit lives in `docs/feature-audit.csv`).

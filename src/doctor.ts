@@ -5,6 +5,7 @@ import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { loadCorpus } from './engine/corpus.js';
+import { resolveOverlayPath } from './engine/overlay-path.js';
 import { getPackageRoot, getPackageVersion } from './paths.js';
 import { compareVersions, fetchLatestVersion, updateCheckDisabled } from './update-check.js';
 
@@ -324,10 +325,10 @@ async function checkForUpdate(): Promise<Check | null> {
 //  1. Is the MCP server WIRED to read per-project overlays? (the baked
 //     STARLOG_PRIVATE_* env — absent on installs predating that wiring.)
 //  2. What has THIS project actually authored under `.starlog/`?
-const OVERLAY_FILES: Array<{ rel: string; key: string; label: string }> = [
-  { rel: '.starlog/private-facts.json', key: 'l2', label: 'vetting' },
-  { rel: '.starlog/private-corpus.json', key: 'manifests', label: 'discovery' },
-  { rel: '.starlog/policy.json', key: 'rules', label: 'policy' },
+const OVERLAY_FILES: Array<{ rel: string; key: string; label: string; envKey: string }> = [
+  { rel: '.starlog/private-facts.json', key: 'l2', label: 'vetting', envKey: 'STARLOG_PRIVATE_FACTS' },
+  { rel: '.starlog/private-corpus.json', key: 'manifests', label: 'discovery', envKey: 'STARLOG_PRIVATE_CORPUS' },
+  { rel: '.starlog/policy.json', key: 'rules', label: 'policy', envKey: 'STARLOG_POLICY' },
 ];
 
 function mcpEnv(settings: Record<string, unknown> | null): Record<string, string> | null {
@@ -341,12 +342,28 @@ export async function checkPrivateOverlays(settings: Record<string, unknown> | n
   // 1. Wiring — only meaningful once the MCP server is configured at all.
   if (resolveMcpCommand(settings)) {
     const env = mcpEnv(settings);
-    const wired = !!(env?.STARLOG_PRIVATE_CORPUS && env?.STARLOG_PRIVATE_FACTS);
-    checks.push(
-      wired
-        ? { level: 'ok', label: 'Private overlays wired', detail: 'agent reads this project’s .starlog/ (vetting + discovery + policy)' }
-        : { level: 'warn', label: 'Private overlays wired', detail: 'MCP server has no overlay env — re-run `starlog init` so the agent reads private facts/discovery' },
-    );
+    const present = !!(env?.STARLOG_PRIVATE_CORPUS && env?.STARLOG_PRIVATE_FACTS);
+    if (!present) {
+      checks.push({ level: 'warn', label: 'Private overlays wired', detail: 'MCP server has no overlay env — re-run `starlog init` so the agent reads private facts/discovery' });
+    } else {
+      // Presence of the env key is NOT enough. Resolve each wired path exactly as the
+      // server will at runtime — it expands `${CLAUDE_PROJECT_DIR}` to THIS project
+      // root — and confirm it lands on <projectDir>/.starlog/. A path that resolves
+      // elsewhere (a stale absolute path, a cross-project leak, a typo) means the agent
+      // silently reads a different location, which the old presence-only check missed.
+      const misrouted: string[] = [];
+      for (const { rel, label, envKey } of OVERLAY_FILES) {
+        const raw = env?.[envKey];
+        if (!raw) continue; // policy is optional; absent key is not a misroute
+        const resolved = resolveOverlayPath(raw, projectDir);
+        if (resolved !== join(projectDir, rel)) misrouted.push(`${label} → ${resolved}`);
+      }
+      checks.push(
+        misrouted.length === 0
+          ? { level: 'ok', label: 'Private overlays wired', detail: 'agent reads this project’s .starlog/ (vetting + discovery + policy)' }
+          : { level: 'warn', label: 'Private overlays wired', detail: `MCP env points outside this project (${misrouted.join('; ')}) — the agent won't read ${join(projectDir, '.starlog')}; re-run \`starlog init\`` },
+      );
+    }
   }
 
   // 2. What's authored in THIS project (counts, and a nudge when empty).
