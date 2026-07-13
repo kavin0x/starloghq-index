@@ -2,6 +2,10 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.8.0
+
+- **feat(cli): `search` / `facts` auto-detect a project-local `.starlog/`.** The MCP server has `STARLOG_PRIVATE_FACTS` / `STARLOG_PRIVATE_CORPUS` / `STARLOG_POLICY` baked into its env by `starlog init`, but the standalone CLI did not — so a bare `starlog search` / `starlog facts` in a project that had authored `.starlog/` overlays returned public-only unless you `export`ed the path by hand (CLI ≠ MCP; same repo, different answers). The CLI now falls back to a project-local `.starlog/{private-corpus,private-facts,policy}.json`, discovered by walking **up** from the current directory, so it surfaces the same org-private packages the agent sees — from anywhere in the project tree, no export needed. An explicit `STARLOG_PRIVATE_*` still overrides, and the shared `runSearch` / `buildComposeDeps` stay env-only (the MCP server is unchanged). The `corpus add` / `facts add` / `facts policy` default-path hints now say "…from this project: …" instead of pointing at the env var. (#59)
+
 ## 0.7.1
 
 Fixes and upgrade hardening from a full feature audit (every user-facing behaviour tested against the built CLI/MCP server/hook — the audit lives in `docs/feature-audit.csv`).
