@@ -9,8 +9,7 @@
     "node",
     "express",
     "next.js",
-    "nest.js",
-    "browser"
+    "nest.js"
   ],
   "integration_effort": "easy",
   "best_for": [
@@ -18,12 +17,12 @@
     "Teams that want email validation, mailing lists, and inbound routing in one vendor",
     "Node backends integrating Mailgun domains, templates, and delivery webhooks",
     "Migrations from SMTP-based Nodemailer setups to an HTTP ESP",
-    "Products that already use Mailgun EU/US regions for data residency"
+    "Products that already use Mailgun EU or US regions for data residency"
   ],
   "skip_when": [
-    "You want the newest React-email-centric DX (Resend) with minimal ESP surface area",
+    "You want React-email-centric DX with minimal ESP surface area (consider Resend)",
     "You need pure self-hosted sending with no ESP contract",
-    "Cost optimization points to SES at high volume on AWS",
+    "Cost optimization at high volume points to Amazon SES on AWS",
     "You only need a thin SMTP transport and Nodemailer is enough",
     "You prefer Postmark's transactional-only focus and message streams model"
   ],

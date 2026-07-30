@@ -29,7 +29,7 @@
     "You want zero auth infrastructure and prefer a fully managed UI+API vendor (Clerk, Auth0, WorkOS)",
     "You need a minimal library that only verifies JWTs and nothing else",
     "Your backend is not TypeScript/JavaScript",
-    "You require a long-frozen, conservative API surface and prefer Auth.js's longer track record over a fast-moving project",
+    "You prefer Auth.js (next-auth) for its longer production track record and more conservative API evolution",
     "Compliance requires an enterprise IdP with SOC2-backed hosted identity you do not operate yourself"
   ],
   "hosted_alternative": {

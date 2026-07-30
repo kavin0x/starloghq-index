@@ -4,34 +4,34 @@
   "repo": "mqttjs/MQTT.js",
   "ecosystem": "npm",
   "category": "realtime",
-  "solves": "Provides a full-featured MQTT client for Node.js and browsers to publish/subscribe over MQTT 3.1/5.0, enabling IoT and event-bus style messaging with QoS, retained messages, and broker interoperability.",
+  "solves": "Provides a full-featured MQTT client for Node.js and browsers to publish and subscribe over MQTT 3.1/5.0 \u2014 the standard for IoT and broker-based telemetry, not a general-purpose web multiplayer or chat transport.",
   "stack_affinity": [
     "node",
     "iot",
-    "browser",
     "embedded",
     "aws-iot",
-    "mosquitto"
+    "mosquitto",
+    "hivemq"
   ],
   "integration_effort": "moderate",
   "best_for": [
-    "IoT and device fleets that speak MQTT to brokers (Mosquitto, HiveMQ, AWS IoT)",
-    "Event-driven systems using pub/sub topics with QoS and retained messages",
-    "Browser or Node clients that must interoperate with existing MQTT infrastructure",
-    "Telemetry pipelines where MQTT is the organizational standard",
-    "Bridging devices to cloud IoT platforms via MQTT.js"
+    "IoT and device fleets that speak MQTT to brokers (Mosquitto, HiveMQ, AWS IoT Core)",
+    "Telemetry and event buses that use topic hierarchies with QoS and retained messages",
+    "Node or browser clients that must interoperate with existing MQTT infrastructure",
+    "Bridging devices to cloud IoT platforms via MQTT.js",
+    "Industrial or embedded systems where MQTT is already the organizational standard"
   ],
   "skip_when": [
-    "You are building browser collaborative docs \u2014 use Yjs/Liveblocks/Socket.IO instead",
-    "You need a managed WebSocket pub/sub UX for web apps (Pusher/Ably)",
-    "You only need raw WebSockets without MQTT protocol semantics",
+    "You are building browser collaborative docs, multiplayer presence, or chat \u2014 use Yjs, Liveblocks, Socket.IO, Ably, or Pusher instead",
+    "You need a managed WebSocket pub/sub UX for consumer web apps",
+    "You only need raw WebSockets without MQTT protocol semantics \u2014 use `ws`",
     "Your environment blocks MQTT ports and you lack a WebSocket MQTT bridge",
-    "Application-level rooms/namespaces of Socket.IO fit better than topic hierarchies"
+    "Application-level rooms and namespaces (Socket.IO) fit better than MQTT topic hierarchies"
   ],
   "hosted_alternative": {
     "name": "Ably",
     "manifest_id": "ably",
-    "pricing_summary": "Free tier with message limits; paid plans scale with messages and connections"
+    "pricing_summary": "Free tier with message limits; paid plans scale with messages and connections \u2014 better default for web app realtime than self-running MQTT"
   },
   "alternative_ids": [
     "socket-io",

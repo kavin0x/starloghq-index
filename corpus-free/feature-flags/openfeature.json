@@ -4,14 +4,13 @@
   "repo": "open-feature/js-sdk",
   "ecosystem": "npm",
   "category": "feature-flags",
-  "solves": "Provides a vendor-neutral OpenFeature SDK for Node and web so application code evaluates flags through a standard API while providers (LaunchDarkly, Unleash, flagd, etc.) remain swappable behind the interface.",
+  "solves": "Provides a vendor-neutral OpenFeature SDK for Node and web so application code evaluates flags through a standard API while providers (LaunchDarkly, Unleash, flagd, and others) remain swappable behind the interface. It is an abstraction layer, not a flag product.",
   "stack_affinity": [
     "node",
-    "browser",
-    "react",
+    "typescript",
     "nest.js",
     "express",
-    "typescript"
+    "browser"
   ],
   "integration_effort": "moderate",
   "best_for": [
@@ -19,13 +18,13 @@
     "Enterprises standardizing flag evaluation behind OpenFeature providers across services",
     "Teams mid-migration between flag vendors who need a stable application API",
     "Organizations adopting CNCF OpenFeature as a governance requirement",
-    "Polyglot estates where OpenFeature is the common abstraction"
+    "Polyglot estates where OpenFeature is the common evaluation abstraction"
   ],
   "skip_when": [
-    "You want an all-in-one flags+analytics product and are happy locking to PostHog/GrowthBook APIs",
-    "You need a single SDK with built-in UI and experimentation \u2014 OpenFeature is an abstraction, not a platform",
+    "You need a flag product with an admin UI, targeting, and rollouts \u2014 pick LaunchDarkly, Unleash, GrowthBook, Flagsmith, or PostHog, then optionally wrap them with OpenFeature",
+    "You have not chosen a provider yet and just need boolean toggles \u2014 OpenFeature alone does not store or serve flags",
     "A simple env-based toggle is enough and provider wiring is overhead",
-    "Your chosen vendor's native SDK is required for advanced features not exposed via the provider",
+    "Your chosen vendor's native SDK is required for advanced features not exposed via its OpenFeature provider",
     "You are prototyping quickly and vendor neutrality is not a near-term concern"
   ],
   "hosted_alternative": null,
@@ -36,6 +35,7 @@
     "flagsmith",
     "posthog",
     "configcat",
+    "devcycle",
     "custom-feature-flags"
   ],
   "health": {

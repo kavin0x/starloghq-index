@@ -38,6 +38,7 @@
     "mikro-orm",
     "knex",
     "mongoose",
+    "postgres-js",
     "custom-orm"
   ],
   "health": {

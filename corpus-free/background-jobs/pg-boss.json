@@ -4,7 +4,7 @@
   "repo": "timgit/pg-boss",
   "ecosystem": "npm",
   "category": "background-jobs",
-  "solves": "Provides a Postgres-backed job queue for Node.js with exactly-once delivery semantics via SKIP LOCKED, cron/schedules, retries, priorities, and pub/sub \u2014 without introducing Redis as infrastructure.",
+  "solves": "Provides a Postgres-backed job queue for Node.js using SKIP LOCKED for safe concurrent claiming, with cron/schedules, retries, priorities, and pub/sub \u2014 without introducing Redis as infrastructure.",
   "stack_affinity": [
     "node",
     "express",

@@ -4,7 +4,7 @@
   "repo": "firebase/firebase-js-sdk",
   "ecosystem": "npm",
   "category": "authentication",
-  "solves": "Provides Google Firebase Authentication client SDKs for email/password, phone, anonymous, and federated identity providers, with tight integration to Firebase/Firestore/App Check and multi-platform clients (web, iOS, Android, Flutter).",
+  "solves": "Provides Firebase Authentication via the Firebase JS SDK (`firebase` / `firebase/auth`) for email/password, phone, anonymous, and federated identity providers, with tight integration to other Firebase products and multi-platform clients.",
   "stack_affinity": [
     "react",
     "next.js",

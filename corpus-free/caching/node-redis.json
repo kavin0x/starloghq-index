@@ -1,10 +1,10 @@
 {
   "id": "node-redis",
-  "name": "node-redis",
+  "name": "node-redis (redis)",
   "repo": "redis/node-redis",
   "ecosystem": "npm",
   "category": "caching",
-  "solves": "Provides the official Redis client for Node.js (npm package `redis`) with modern Promise APIs, clustering, Sentinel, Lua scripting, Pub/Sub, streams, and first-class TypeScript types \u2014 suitable for caching and general Redis access.",
+  "solves": "Provides the official Redis / Valkey client for Node.js (npm package `redis`) with modern Promise APIs, clustering, Sentinel, Lua scripting, Pub/Sub, streams, and first-class TypeScript types — suitable for shared caching and general Redis access.",
   "stack_affinity": [
     "node",
     "express",

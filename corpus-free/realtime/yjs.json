@@ -4,7 +4,7 @@
   "repo": "yjs/yjs",
   "ecosystem": "npm",
   "category": "realtime",
-  "solves": "Provides high-performance CRDT-based shared data types for building collaborative editors and multiplayer apps, with a rich ecosystem of providers (WebSocket, WebRTC, TipTap, Monaco, CodeMirror) for conflict-free sync.",
+  "solves": "Provides high-performance CRDT shared types for collaborative editors and multiplayer document state, with providers for WebSocket, WebRTC, TipTap, Monaco, and CodeMirror \u2014 a conflict-free sync engine, not a generic pub/sub transport.",
   "stack_affinity": [
     "react",
     "next.js",
@@ -25,11 +25,11 @@
     "Teams that want open-source collaboration primitives rather than a full hosted suite"
   ],
   "skip_when": [
-    "You only need simple pub/sub events or chat without collaborative document state \u2014 use Socket.IO/Ably",
-    "You want a fully managed multiplayer room product (Liveblocks/PartyKit) with less CRDT expertise",
-    "Your problem is IoT device messaging (MQTT) rather than shared mutable state",
+    "You only need simple pub/sub events or chat without collaborative document state \u2014 use Socket.IO or Ably",
+    "You want a fully managed multiplayer room product (Liveblocks) with less CRDT expertise",
+    "Your problem is IoT device messaging (MQTT) rather than shared mutable document state",
     "You need only one-way server push (SSE) without peer document merging",
-    "Integration budget cannot absorb CRDT modeling and provider ops"
+    "Integration budget cannot absorb CRDT modeling and sync-provider operations"
   ],
   "hosted_alternative": {
     "name": "Liveblocks",
