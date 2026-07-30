@@ -1,0 +1,58 @@
+{
+  "id": "aws-cognito",
+  "name": "Amazon Cognito",
+  "repo": "aws/aws-sdk-js-v3",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides AWS SDK clients for Amazon Cognito user pools and identity pools \u2014 managed sign-up/sign-in, federated IdPs, MFA, and AWS credential vending for mobile and web apps in the AWS ecosystem.",
+  "stack_affinity": [
+    "node",
+    "aws-lambda",
+    "amplify",
+    "react",
+    "next.js",
+    "react-native",
+    "angular",
+    "vue"
+  ],
+  "integration_effort": "significant",
+  "best_for": [
+    "AWS-centric architectures that want managed user pools integrated with IAM, API Gateway, and Lambda",
+    "Enterprises standardized on Cognito for compliance, VPC, and AWS Organizations controls",
+    "Mobile/web apps using Amplify Auth that already target Cognito user pools",
+    "Workloads needing federated enterprise IdPs into AWS-authenticated backends",
+    "Teams that prefer pay-as-you-go AWS identity over a separate auth SaaS vendor"
+  ],
+  "skip_when": [
+    "You want a delightful pre-built auth UI and DX comparable to Clerk without Amplify/custom UI work",
+    "You are not on AWS and do not want Cognito/IAM coupling",
+    "You need the simplest possible Next.js auth setup \u2014 Cognito configuration and SDK surface are heavy",
+    "You prefer open-source self-hosted Auth.js/Better Auth on your own database",
+    "Developer experience and docs clarity matter more than AWS ecosystem fit"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "auth0",
+    "clerk",
+    "nextauth",
+    "better-auth",
+    "firebase-auth",
+    "supabase-auth",
+    "workos",
+    "custom-authentication"
+  ],
+  "health": {
+    "stars": 3648,
+    "weekly_downloads": 3541272,
+    "last_commit": "2026-07-29T20:42:17Z",
+    "contributors": 169,
+    "license": "Apache-2.0",
+    "open_issues": 140
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "id": "unleash",
+  "name": "Unleash",
+  "repo": "Unleash/unleash",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides an open-source feature management platform with official SDKs (including `unleash-client` for Node) for gradual rollouts, strategies, constraints, and self-hosted or Unleash-hosted control planes.",
+  "stack_affinity": [
+    "node",
+    "react",
+    "java",
+    "go",
+    "python",
+    "dotnet",
+    "mobile"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Organizations that want self-hosted feature flags with a mature admin UI and multi-language SDKs",
+    "Node backends using unleash-client for server-side evaluation with streaming/polling updates",
+    "Enterprises needing flexible activation strategies and constraints without pure SaaS lock-in",
+    "Platform teams standardizing feature management across many services/languages",
+    "Migrations off homemade toggle tables toward a dedicated FM system"
+  ],
+  "skip_when": [
+    "You want flags bundled with product analytics (PostHog) rather than a dedicated FM tool",
+    "AGPL self-host licensing is incompatible with your distribution model \u2014 evaluate Unleash hosted or another vendor",
+    "You only need OpenFeature plumbing and will choose a different provider behind it",
+    "A tiny boolean config in env vars is enough",
+    "You prefer GrowthBook's experimentation-first workflow"
+  ],
+  "hosted_alternative": {
+    "name": "Unleash Hosted",
+    "manifest_id": "unleash",
+    "pricing_summary": "Open-source self-host (AGPL) available; Unleash Cloud/Enterprise plans are commercial"
+  },
+  "alternative_ids": [
+    "launchdarkly",
+    "growthbook",
+    "flagsmith",
+    "posthog",
+    "openfeature",
+    "statsig",
+    "configcat",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 13701,
+    "weekly_downloads": 729006,
+    "last_commit": "2026-07-29T08:58:30Z",
+    "contributors": 249,
+    "license": "AGPL-3.0",
+    "open_issues": 63
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

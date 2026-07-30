@@ -1,0 +1,55 @@
+{
+  "id": "openfeature",
+  "name": "OpenFeature",
+  "repo": "open-feature/js-sdk",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides a vendor-neutral OpenFeature SDK for Node and web so application code evaluates flags through a standard API while providers (LaunchDarkly, Unleash, flagd, etc.) remain swappable behind the interface.",
+  "stack_affinity": [
+    "node",
+    "browser",
+    "react",
+    "nest.js",
+    "express",
+    "typescript"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Platforms that must avoid hard-wiring a single feature-flag vendor into application code",
+    "Enterprises standardizing flag evaluation behind OpenFeature providers across services",
+    "Teams mid-migration between flag vendors who need a stable application API",
+    "Organizations adopting CNCF OpenFeature as a governance requirement",
+    "Polyglot estates where OpenFeature is the common abstraction"
+  ],
+  "skip_when": [
+    "You want an all-in-one flags+analytics product and are happy locking to PostHog/GrowthBook APIs",
+    "You need a single SDK with built-in UI and experimentation \u2014 OpenFeature is an abstraction, not a platform",
+    "A simple env-based toggle is enough and provider wiring is overhead",
+    "Your chosen vendor's native SDK is required for advanced features not exposed via the provider",
+    "You are prototyping quickly and vendor neutrality is not a near-term concern"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "launchdarkly",
+    "unleash",
+    "growthbook",
+    "flagsmith",
+    "posthog",
+    "configcat",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 277,
+    "weekly_downloads": 5485392,
+    "last_commit": "2026-07-28T19:19:53Z",
+    "contributors": 45,
+    "license": "Apache-2.0",
+    "open_issues": 45
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

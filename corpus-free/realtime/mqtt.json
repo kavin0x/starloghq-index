@@ -1,0 +1,58 @@
+{
+  "id": "mqtt",
+  "name": "MQTT.js",
+  "repo": "mqttjs/MQTT.js",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides a full-featured MQTT client for Node.js and browsers to publish/subscribe over MQTT 3.1/5.0, enabling IoT and event-bus style messaging with QoS, retained messages, and broker interoperability.",
+  "stack_affinity": [
+    "node",
+    "iot",
+    "browser",
+    "embedded",
+    "aws-iot",
+    "mosquitto"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "IoT and device fleets that speak MQTT to brokers (Mosquitto, HiveMQ, AWS IoT)",
+    "Event-driven systems using pub/sub topics with QoS and retained messages",
+    "Browser or Node clients that must interoperate with existing MQTT infrastructure",
+    "Telemetry pipelines where MQTT is the organizational standard",
+    "Bridging devices to cloud IoT platforms via MQTT.js"
+  ],
+  "skip_when": [
+    "You are building browser collaborative docs \u2014 use Yjs/Liveblocks/Socket.IO instead",
+    "You need a managed WebSocket pub/sub UX for web apps (Pusher/Ably)",
+    "You only need raw WebSockets without MQTT protocol semantics",
+    "Your environment blocks MQTT ports and you lack a WebSocket MQTT bridge",
+    "Application-level rooms/namespaces of Socket.IO fit better than topic hierarchies"
+  ],
+  "hosted_alternative": {
+    "name": "Ably",
+    "manifest_id": "ably",
+    "pricing_summary": "Free tier with message limits; paid plans scale with messages and connections"
+  },
+  "alternative_ids": [
+    "socket-io",
+    "ws",
+    "ably",
+    "pusher",
+    "supabase-realtime",
+    "custom-realtime"
+  ],
+  "health": {
+    "stars": 9103,
+    "weekly_downloads": 2582894,
+    "last_commit": "2026-07-20T09:30:03Z",
+    "contributors": 242,
+    "license": "MIT",
+    "open_issues": 35
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}
