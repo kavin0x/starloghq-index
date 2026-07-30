@@ -23,7 +23,7 @@ flowchart TB
     subgraph surfaces["Surfaces — identical behavior, shared engine"]
         mcp["MCP server<br/>starlog_facts · starlog_search · starlog_advise"]
         cli["CLI<br/>facts · search · init · org sync · …"]
-        hook["install hook<br/>(PostToolUse: vet on install)"]
+        hook["hooks<br/>(PostToolUse: vet on install<br/>PreToolUse: DIY detect)"]
     end
 
     subgraph engine["Engine — local, offline-first"]
@@ -124,6 +124,27 @@ flowchart LR
   search --> gate["starlog_facts safety gate"]
   gate --> migrate["MIGRATE + playbook"]
   gate --> packageize["PACKAGEIZE + scaffold"]
+```
+
+## DIY hook — proactive hand-rolled code detection
+
+The Claude Code **PreToolUse** hook (and Cursor/Copilot project hooks installed by
+`starlog init`) scores pending `Write`/`Edit`/`MultiEdit` operations for DIY
+capability patterns (auth, caching, jobs, etc.). It gates on confidence and
+recurrence, validates via `runAdvise` (same path as `starlog_advise`), and
+injects migration candidates + package facts. A separate positive path
+acknowledges when known vetted libraries are used. Advisory by default; **deny**
+only when org L3 policy sets `diy_category` to `deny`.
+
+```mermaid
+flowchart LR
+  w["PreToolUse Write|Edit"] --> score["scoreFile"]
+  score --> conf{"confidence / recurrence gate"}
+  conf -->|weak| silent["silent exit"]
+  conf -->|strong| advise["runAdvise"]
+  advise --> policy{"diy_category deny?"}
+  policy -->|yes| deny["permissionDecision deny"]
+  policy -->|no| inject["additionalContext guidance"]
 ```
 
 ## Telemetry & consent
