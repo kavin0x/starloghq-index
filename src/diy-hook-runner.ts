@@ -2,8 +2,12 @@
 //
 // Contract: advisory by default. Reads a Claude Code PreToolUse payload on stdin,
 // scores pending file writes for DIY capability patterns, validates via runAdvise,
-// and injects migration guidance. Denies only when org DIY policy is "deny".
+// and surfaces migration guidance. Denies only when org DIY policy is "deny".
 // Must NEVER throw or block a tool call except on explicit org policy deny.
+//
+// Latency tradeoff: the first qualifying write per category per debounce window
+// runs runAdvise (project scan + corpus search + optional facts network). Debounce
+// avoids repeat cost; richness of migration candidates is intentional on that hit.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -100,7 +104,20 @@ function isSourceFile(filePath: string): boolean {
   return SOURCE_EXTENSIONS.has(ext);
 }
 
-export function extractWritePayload(toolName: string, toolInput: Record<string, unknown>): WritePayload | null {
+/** Relativize absolute tool paths against cwd so path patterns don't match the project dir name. */
+function toRelPath(filePath: string, projectRoot?: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  if (!projectRoot) return normalized;
+  const rel = path.relative(projectRoot, filePath);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return normalized;
+  return rel.replace(/\\/g, '/');
+}
+
+export function extractWritePayload(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  projectRoot?: string,
+): WritePayload | null {
   if (!WRITE_TOOLS.has(toolName)) return null;
 
   const filePath = (toolInput.file_path ?? toolInput.path) as string | undefined;
@@ -118,7 +135,7 @@ export function extractWritePayload(toolName: string, toolInput: Record<string, 
   }
 
   if (!content.trim()) return null;
-  return { relPath: filePath.replace(/\\/g, '/'), content };
+  return { relPath: toRelPath(filePath, projectRoot), content };
 }
 
 async function loadOccurrences(category: string, signals: { kind: string; value: string }[], projectRoot: string): Promise<number> {
@@ -184,6 +201,12 @@ function emitHookOutput(platform: HookPlatform, payload: Parameters<typeof emitP
   emitPreToolUse(platform, payload);
 }
 
+function sparseDenyReason(category: string, policy: DiyPolicyVerdict): string {
+  return [`Org policy blocks hand-rolled ${category} code.`, policy.rationale ?? '']
+    .filter(Boolean)
+    .join(' ');
+}
+
 async function maybeEmitPositiveAck(
   write: WritePayload,
   projectRoot: string,
@@ -196,8 +219,13 @@ async function maybeEmitPositiveAck(
   if (scoreFileForHook(write.relPath, write.content)) return false;
   if (isDebounced(projectRoot, known.category, 'positive')) return false;
 
+  const msg = `[Starlog] Good — using an established ${known.category} library in ${write.relPath}. No DIY migration needed.`;
+  // Cursor still honors additional_context on preToolUse; Claude PreToolUse does not —
+  // permissionDecisionReason with allow is the portable field.
   emitHookOutput(platform, {
-    additionalContext: `[Starlog] Good — using an established ${known.category} library in ${write.relPath}. No DIY migration needed.`,
+    permissionDecision: 'allow',
+    permissionDecisionReason: msg,
+    additionalContext: msg,
   });
   markDebounced(projectRoot, known.category, 'positive');
   return true;
@@ -207,10 +235,10 @@ export async function handleDiyPreToolUse(data: Record<string, unknown>): Promis
   const platform = detectHookPlatform(data);
   const toolName = String(data.tool_name ?? '');
   const toolInput = (data.tool_input ?? {}) as Record<string, unknown>;
-  const write = extractWritePayload(toolName, toolInput);
+  const projectRoot = String(data.cwd ?? process.cwd());
+  const write = extractWritePayload(toolName, toolInput, projectRoot);
   if (!write) return;
 
-  const projectRoot = String(data.cwd ?? process.cwd());
   if (await maybeEmitPositiveAck(write, projectRoot, platform)) return;
 
   const hit = scoreFileForHook(write.relPath, write.content);
@@ -235,39 +263,60 @@ export async function handleDiyPreToolUse(data: Record<string, unknown>): Promis
   if (!shouldAdvise && diyPolicy.decision !== 'deny') return;
   if (isDebounced(projectRoot, hit.category) && diyPolicy.decision !== 'deny') return;
 
-  const observation = `hand-rolled ${hit.category} code in ${write.relPath}`;
-  const advise = await runAdvise({
-    observation,
-    project_root: projectRoot,
-    category: hit.category,
-    force: highConfidence || diyPolicy.decision === 'deny',
-    policyPath,
-  });
-
+  // ── Org deny: emit FIRST so enrichment I/O can never fail-open to allow ──
   if (diyPolicy.decision === 'deny') {
-    const candidates = advise.candidates?.map((c) => c.name).join(', ') || 'see starlog_advise';
-    const reason = [
-      `Org policy blocks hand-rolled ${hit.category} code.`,
-      diyPolicy.rationale ?? '',
-      `Migrate to: ${candidates}.`,
-    ]
-      .filter(Boolean)
-      .join(' ');
+    const sparse = sparseDenyReason(hit.category, diyPolicy);
     emitHookOutput(platform, {
       permissionDecision: 'deny',
-      permissionDecisionReason: reason,
-      additionalContext: await buildAdvisoryMessage(advise, projectRoot, policyPath),
+      permissionDecisionReason: sparse,
     });
     markDebounced(projectRoot, hit.category);
+
+    try {
+      const observation = `hand-rolled ${hit.category} code in ${write.relPath}`;
+      const advise = await runAdvise({
+        observation,
+        project_root: projectRoot,
+        category: hit.category,
+        force: true,
+        policyPath,
+      });
+      const candidates = advise.candidates?.map((c) => c.name).join(', ') || 'see starlog_advise';
+      const enriched = [sparse, `Migrate to: ${candidates}.`].filter(Boolean).join(' ');
+      emitHookOutput(platform, {
+        permissionDecision: 'deny',
+        permissionDecisionReason: enriched,
+      });
+    } catch {
+      // Sparse deny already emitted — never degrade to silent allow.
+    }
     return;
   }
 
   if (!shouldAdvise) return;
 
-  emitHookOutput(platform, {
-    additionalContext: await buildAdvisoryMessage(advise, projectRoot, policyPath),
-  });
-  markDebounced(projectRoot, hit.category);
+  // Advisory path: PreToolUse ignores additionalContext — use ask + reason so the
+  // agent actually sees migration guidance (Claude Code hooks reference).
+  try {
+    const observation = `hand-rolled ${hit.category} code in ${write.relPath}`;
+    const advise = await runAdvise({
+      observation,
+      project_root: projectRoot,
+      category: hit.category,
+      force: highConfidence,
+      policyPath,
+    });
+    const reason = await buildAdvisoryMessage(advise, projectRoot, policyPath);
+    emitHookOutput(platform, {
+      permissionDecision: 'ask',
+      permissionDecisionReason: reason,
+      // Cursor also maps this to additional_context for hosts that support it.
+      additionalContext: reason,
+    });
+    markDebounced(projectRoot, hit.category);
+  } catch {
+    // Advisory only — fail open (no output) on enrichment errors.
+  }
 }
 
 /** Read the PreToolUse payload from stdin and process it. Never throws; always exits 0. */

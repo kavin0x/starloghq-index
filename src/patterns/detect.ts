@@ -88,9 +88,19 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     category: 'realtime',
     pathPatterns: [/websocket/i, /realtime/i, /socket/i],
-    importPatterns: [/\bws\b/, /WebSocket/, /socket\.io/],
+    // Narrow ws to the package import — bare \bws\b is too broad; vetted `ws` /
+    // native WebSocket belong in knownLibPatterns so they zero the DIY score.
+    importPatterns: [/from\s+['"]ws['"]/, /require\(['"]ws['"]\)/, /WebSocket/, /socket\.io/],
     keywordPatterns: [/\bwebsocket\b/i],
-    knownLibPatterns: [/socket\.io/, /@supabase\/realtime/, /pusher-js/, /ably/],
+    knownLibPatterns: [
+      /from\s+['"]ws['"]/,
+      /require\(['"]ws['"]\)/,
+      /WebSocket/,
+      /socket\.io/,
+      /@supabase\/realtime/,
+      /pusher-js/,
+      /ably/,
+    ],
   },
   {
     category: 'background-jobs',

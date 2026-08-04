@@ -14,6 +14,11 @@ const COPILOT_HOOK_SCRIPT = `.github/hooks/${HOOK_FILENAME}`;
 
 const STARLOG_MARKER = 'starlog-pkg-check';
 
+/** Match Claude global init: `node "/abs/path/to/starlog-pkg-check.js"`. */
+function hookCommand(absoluteScriptPath: string): string {
+  return `node "${absoluteScriptPath}"`;
+}
+
 function entryUsesStarlog(entry: { command?: string }): boolean {
   return Boolean(entry.command?.includes(STARLOG_MARKER));
 }
@@ -35,14 +40,14 @@ type CursorHooksConfig = {
   hooks?: Record<string, Array<{ command?: string; matcher?: string; timeout?: number }>>;
 };
 
-function buildCursorHooksConfig(existing: CursorHooksConfig | null, hookScriptRel: string): CursorHooksConfig {
+function buildCursorHooksConfig(existing: CursorHooksConfig | null, hookCmd: string): CursorHooksConfig {
   const config: CursorHooksConfig = existing ? structuredClone(existing) : { version: 1, hooks: {} };
   if (!config.hooks) config.hooks = {};
   if (config.version == null) config.version = 1;
 
-  const preEntry = { command: hookScriptRel, matcher: 'Write|Edit|MultiEdit', timeout: 10 };
+  const preEntry = { command: hookCmd, matcher: 'Write|Edit|MultiEdit', timeout: 10 };
   const shellEntry = {
-    command: hookScriptRel,
+    command: hookCmd,
     matcher: 'npm install|npm i |pnpm add|yarn add|pip install',
     timeout: 10,
   };
@@ -61,15 +66,15 @@ function buildCursorHooksConfig(existing: CursorHooksConfig | null, hookScriptRe
   return config;
 }
 
-function buildCopilotHooksConfig(hookScriptRel: string): Record<string, unknown> {
-  const hookCmd = { type: 'command', command: hookScriptRel, timeout: 10 };
+function buildCopilotHooksConfig(hookCmd: string): Record<string, unknown> {
+  const entry = { type: 'command', command: hookCmd, timeout: 10 };
   return {
     hooks: {
       PreToolUse: [
-        { ...hookCmd, matcher: 'Write|Edit|MultiEdit' },
+        { ...entry, matcher: 'Write|Edit|MultiEdit' },
       ],
       PostToolUse: [
-        { ...hookCmd, matcher: 'Bash' },
+        { ...entry, matcher: 'Bash' },
       ],
     },
   };
@@ -87,9 +92,10 @@ export async function installCursorProjectHooks(projectDir: string): Promise<{ c
   const scriptPath = join(projectDir, CURSOR_HOOK_SCRIPT);
   const hooksPath = join(projectDir, CURSOR_HOOKS_JSON);
   const script = await writeHookScript(scriptPath);
+  const cmd = hookCommand(scriptPath);
 
   const existing = await readJsonIfPresent<CursorHooksConfig>(hooksPath);
-  const desired = buildCursorHooksConfig(existing, CURSOR_HOOK_SCRIPT);
+  const desired = buildCursorHooksConfig(existing, cmd);
   const desiredText = JSON.stringify(desired, null, 2) + '\n';
   let hooksChanged = false;
   try {
@@ -135,7 +141,7 @@ export async function cursorProjectHooksAction(projectDir: string): Promise<'cre
     scriptExists = (await readFile(scriptPath, 'utf8')) === generateHookScript();
   } catch { /* absent */ }
   const existing = await readJsonIfPresent<CursorHooksConfig>(hooksPath);
-  const desired = buildCursorHooksConfig(existing, CURSOR_HOOK_SCRIPT);
+  const desired = buildCursorHooksConfig(existing, hookCommand(scriptPath));
   const hooksMatch = existing != null && JSON.stringify(existing) === JSON.stringify(desired);
   if (scriptExists && hooksMatch) return 'unchanged';
   return existing == null && !scriptExists ? 'create' : 'update';
@@ -145,8 +151,9 @@ export async function installCopilotProjectHooks(projectDir: string): Promise<{ 
   const scriptPath = join(projectDir, COPILOT_HOOK_SCRIPT);
   const hooksPath = join(projectDir, COPILOT_HOOKS_JSON);
   const script = await writeHookScript(scriptPath);
+  const cmd = hookCommand(scriptPath);
 
-  const desired = buildCopilotHooksConfig(COPILOT_HOOK_SCRIPT);
+  const desired = buildCopilotHooksConfig(cmd);
   const desiredText = JSON.stringify(desired, null, 2) + '\n';
   let hooksChanged = false;
   try {
@@ -182,7 +189,7 @@ export async function copilotProjectHooksAction(projectDir: string): Promise<'cr
     scriptExists = (await readFile(scriptPath, 'utf8')) === generateHookScript();
   } catch { /* absent */ }
   const existing = await readJsonIfPresent<Record<string, unknown>>(hooksPath);
-  const desired = buildCopilotHooksConfig(COPILOT_HOOK_SCRIPT);
+  const desired = buildCopilotHooksConfig(hookCommand(scriptPath));
   const hooksMatch = existing != null && JSON.stringify(existing) === JSON.stringify(desired);
   if (scriptExists && hooksMatch) return 'unchanged';
   return existing == null && !scriptExists ? 'create' : 'update';

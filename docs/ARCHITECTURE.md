@@ -132,19 +132,28 @@ The Claude Code **PreToolUse** hook (and Cursor/Copilot project hooks installed 
 `starlog init`) scores pending `Write`/`Edit`/`MultiEdit` operations for DIY
 capability patterns (auth, caching, jobs, etc.). It gates on confidence and
 recurrence, validates via `runAdvise` (same path as `starlog_advise`), and
-injects migration candidates + package facts. A separate positive path
-acknowledges when known vetted libraries are used. Advisory by default; **deny**
-only when org L3 policy sets `diy_category` to `deny`.
+surfaces migration candidates + package facts via `permissionDecision: "ask"` +
+`permissionDecisionReason` (PreToolUse does not honor `additionalContext` —
+that field is PostToolUse-only). A separate positive path acknowledges when known
+vetted libraries are used. Advisory by default; **deny** only when org L3 policy
+sets `diy_category` to `deny` (deny is emitted before enrichment so I/O failures
+never fail-open).
+
+**Latency tradeoff:** the first qualifying write per category per debounce window
+pays for a full `runAdvise` (project scan + corpus search + optional facts
+network). Debounce (10m DIY / 30m positive) avoids repeat cost; richness of
+migration candidates on that first hit is intentional.
 
 ```mermaid
 flowchart LR
   w["PreToolUse Write|Edit"] --> score["scoreFile"]
   score --> conf{"confidence / recurrence gate"}
   conf -->|weak| silent["silent exit"]
-  conf -->|strong| advise["runAdvise"]
-  advise --> policy{"diy_category deny?"}
-  policy -->|yes| deny["permissionDecision deny"]
-  policy -->|no| inject["additionalContext guidance"]
+  conf -->|strong| policy{"diy_category deny?"}
+  policy -->|yes| denyFirst["emit deny sparse"]
+  denyFirst --> enrich["try runAdvise enrich"]
+  policy -->|no| advise["runAdvise"]
+  advise --> ask["permissionDecision ask + reason"]
 ```
 
 ## Telemetry & consent

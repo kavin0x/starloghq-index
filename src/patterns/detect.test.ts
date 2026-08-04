@@ -94,6 +94,27 @@ export async function hashPassword(pw: string) { return bcrypt.hash(pw, 10); }`,
     expect(hit?.category).toBe('authentication');
   });
 
+  it('does not flag vetted ws / native WebSocket as DIY realtime', () => {
+    expect(
+      scoreFileForHook(
+        'src/realtime/server.ts',
+        `import { WebSocketServer } from 'ws';\nexport const wss = new WebSocketServer({ port: 8080 });`,
+      ),
+    ).toBeNull();
+    expect(
+      detectKnownLibraryUse(
+        'src/realtime/server.ts',
+        `import { WebSocketServer } from 'ws';`,
+      )?.category,
+    ).toBe('realtime');
+    expect(
+      scoreFileForHook(
+        'src/socket/client.ts',
+        `const ws = new WebSocket('wss://example.com');`,
+      ),
+    ).toBeNull();
+  });
+
   it('scoreFile returns null for weak signals', () => {
     const hit = scoreFile('src/utils.ts', 'export const x = 1;');
     expect(hit).toBeNull();
